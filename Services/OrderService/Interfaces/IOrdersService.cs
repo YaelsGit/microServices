@@ -11,6 +11,6 @@ public interface IOrdersService
     Task<(bool Success, int OrderId, string Message)> CreateOrderAsync(int userId, DtoCreateOrderRequest request);
     Task<IEnumerable<DtoOrders>> GetUserOrdersAsync(int userId);
     Task<DtoOrders?> GetOrderByIdAsync(int orderId);
-    Task<bool> CancelOrderAsync(int orderId);
+    Task<(bool Success, string Message)> CancelOrderAsync(int orderId);
     Task<IEnumerable<DtoOrderReport>> GetOrdersByGiftAsync();
 }

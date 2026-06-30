@@ -43,3 +43,8 @@ public class DtoGiftFilter
     public int? DonorId { get; set; }
     public string? SearchTerm { get; set; }
 }
+
+public class DtoUpdateGiftQuantityRequest
+{
+    public int QuantityChange { get; set; }
+}

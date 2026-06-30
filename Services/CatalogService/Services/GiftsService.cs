@@ -156,6 +156,34 @@ public class GiftsService : IGiftsService
     }
 
     /// <summary>
+    /// Update gift quantity
+    /// </summary>
+    public async Task<bool> UpdateGiftQuantityAsync(int giftId, int quantityChange)
+    {
+        try
+        {
+            var gift = await _repository.GetGiftByIdAsync(giftId);
+            if (gift == null)
+            {
+                _logger.LogWarning($"Update quantity attempt for non-existent gift: {giftId}");
+                return false;
+            }
+
+            var success = await _repository.UpdateGiftQuantityAsync(giftId, quantityChange);
+            if (success)
+            {
+                _logger.LogInformation($"Gift {giftId} quantity updated by: {quantityChange}");
+            }
+            return success;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error updating gift quantity: {giftId}");
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Get gifts by price range
     /// </summary>
     public async Task<IEnumerable<DtoGifts>> GetGiftsByPriceRangeAsync(decimal minPrice, decimal maxPrice)

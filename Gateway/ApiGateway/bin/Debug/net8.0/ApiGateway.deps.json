@@ -9,7 +9,8 @@
       "ApiGateway/1.0.0": {
         "dependencies": {
           "Microsoft.AspNetCore.Authentication.JwtBearer": "8.0.11",
-          "Ocelot": "21.0.0",
+          "Ocelot": "24.1.0",
+          "Ocelot.Provider.Consul": "24.1.0",
           "Serilog.AspNetCore": "8.0.0",
           "Serilog.Sinks.File": "5.0.0",
           "SharedModels": "1.0.0"
@@ -18,19 +19,30 @@
           "ApiGateway.dll": {}
         }
       },
-      "FluentValidation/11.8.0": {
+      "Consul/1.7.14.9": {
+        "dependencies": {
+          "Newtonsoft.Json": "13.0.3"
+        },
         "runtime": {
-          "lib/net7.0/FluentValidation.dll": {
-            "assemblyVersion": "11.0.0.0",
-            "fileVersion": "11.8.0.0"
+          "lib/netstandard2.0/Consul.dll": {
+            "assemblyVersion": "1.7.14.9",
+            "fileVersion": "1.7.14.9"
           }
         }
       },
-      "IPAddressRange/6.0.0": {
+      "FluentValidation/12.1.1": {
+        "runtime": {
+          "lib/net8.0/FluentValidation.dll": {
+            "assemblyVersion": "12.0.0.0",
+            "fileVersion": "12.1.1.0"
+          }
+        }
+      },
+      "IPAddressRange/6.3.0": {
         "runtime": {
           "lib/net8.0/IPAddressRange.dll": {
-            "assemblyVersion": "6.0.0.0",
-            "fileVersion": "6.0.0.0"
+            "assemblyVersion": "6.3.0.0",
+            "fileVersion": "6.3.0.0"
           }
         }
       },
@@ -45,35 +57,46 @@
           }
         }
       },
-      "Microsoft.AspNetCore.JsonPatch/8.0.0": {
+      "Microsoft.AspNetCore.JsonPatch/8.0.22": {
         "dependencies": {
           "Newtonsoft.Json": "13.0.3"
         },
         "runtime": {
           "lib/net8.0/Microsoft.AspNetCore.JsonPatch.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.23.53112"
+            "assemblyVersion": "8.0.22.0",
+            "fileVersion": "8.0.2225.52808"
           }
         }
       },
-      "Microsoft.AspNetCore.MiddlewareAnalysis/8.0.0": {
+      "Microsoft.AspNetCore.MiddlewareAnalysis/8.0.22": {
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "8.0.2"
+        },
         "runtime": {
           "lib/net8.0/Microsoft.AspNetCore.MiddlewareAnalysis.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.23.53112"
+            "assemblyVersion": "8.0.22.0",
+            "fileVersion": "8.0.2225.52808"
           }
         }
       },
-      "Microsoft.AspNetCore.Mvc.NewtonsoftJson/8.0.0": {
+      "Microsoft.AspNetCore.Mvc.NewtonsoftJson/8.0.22": {
         "dependencies": {
-          "Microsoft.AspNetCore.JsonPatch": "8.0.0",
+          "Microsoft.AspNetCore.JsonPatch": "8.0.22",
           "Newtonsoft.Json": "13.0.3",
           "Newtonsoft.Json.Bson": "1.0.2"
         },
         "runtime": {
           "lib/net8.0/Microsoft.AspNetCore.Mvc.NewtonsoftJson.dll": {
+            "assemblyVersion": "8.0.22.0",
+            "fileVersion": "8.0.2225.52808"
+          }
+        }
+      },
+      "Microsoft.Extensions.DependencyInjection.Abstractions/8.0.2": {
+        "runtime": {
+          "lib/net8.0/Microsoft.Extensions.DependencyInjection.Abstractions.dll": {
             "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.23.53112"
+            "fileVersion": "8.0.1024.46610"
           }
         }
       },
@@ -177,18 +200,30 @@
           }
         }
       },
-      "Ocelot/21.0.0": {
+      "Ocelot/24.1.0": {
         "dependencies": {
-          "FluentValidation": "11.8.0",
-          "IPAddressRange": "6.0.0",
-          "Microsoft.AspNetCore.MiddlewareAnalysis": "8.0.0",
-          "Microsoft.AspNetCore.Mvc.NewtonsoftJson": "8.0.0",
+          "FluentValidation": "12.1.1",
+          "IPAddressRange": "6.3.0",
+          "Microsoft.AspNetCore.MiddlewareAnalysis": "8.0.22",
+          "Microsoft.AspNetCore.Mvc.NewtonsoftJson": "8.0.22",
           "Microsoft.Extensions.DiagnosticAdapter": "3.1.32"
         },
         "runtime": {
           "lib/net8.0/Ocelot.dll": {
-            "assemblyVersion": "21.0.0.0",
-            "fileVersion": "21.0.0.0"
+            "assemblyVersion": "24.1.0.0",
+            "fileVersion": "24.1.0.0"
+          }
+        }
+      },
+      "Ocelot.Provider.Consul/24.1.0": {
+        "dependencies": {
+          "Consul": "1.7.14.9",
+          "Ocelot": "24.1.0"
+        },
+        "runtime": {
+          "lib/net8.0/Ocelot.Provider.Consul.dll": {
+            "assemblyVersion": "24.1.0.0",
+            "fileVersion": "24.1.0.0"
           }
         }
       },
@@ -220,6 +255,7 @@
       },
       "Serilog.Extensions.Hosting/8.0.0": {
         "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "8.0.2",
           "Serilog": "3.1.1",
           "Serilog.Extensions.Logging": "8.0.0"
         },
@@ -329,19 +365,26 @@
       "serviceable": false,
       "sha512": ""
     },
-    "FluentValidation/11.8.0": {
+    "Consul/1.7.14.9": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-TiEaaYqSIAS+wXQv46LRm8Mca092XYNePD0n231Hqlkmm5FuToZoWnjI1ef/vJUxBzqR7/k2vaVQXxijNgVKRQ==",
-      "path": "fluentvalidation/11.8.0",
-      "hashPath": "fluentvalidation.11.8.0.nupkg.sha512"
+      "sha512": "sha512-PZD63GVWmIb5KcJL5NP5KZVAMREKBTL5mj9ra4Nm2vZeVjPlTkbFfLHxinEIB7BRzjyh/5V3P5RjrfJI52nocw==",
+      "path": "consul/1.7.14.9",
+      "hashPath": "consul.1.7.14.9.nupkg.sha512"
     },
-    "IPAddressRange/6.0.0": {
+    "FluentValidation/12.1.1": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-3vLppw2bi+LjM/M5TRQBrQ2kRYFge3+aphf5FiKefEImBG/sUM5sYV2TVYbWnZTHTnW24Gc5CucsohGu/GN9gQ==",
-      "path": "ipaddressrange/6.0.0",
-      "hashPath": "ipaddressrange.6.0.0.nupkg.sha512"
+      "sha512": "sha512-EPpkIe1yh1a0OXyC100oOA8WMbZvqUu5plwhvYcb7oSELfyUZzfxV48BLhvs3kKo4NwG7MGLNgy1RJiYtT8Dpw==",
+      "path": "fluentvalidation/12.1.1",
+      "hashPath": "fluentvalidation.12.1.1.nupkg.sha512"
+    },
+    "IPAddressRange/6.3.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-VrGoeUz+ZK2QiwHNj+vab9uOvTDucenRseJZjc4uB7ASduQ7RNWnpd8gy1e9z2BsY4VoigVaCRrcQCQKuQVSiw==",
+      "path": "ipaddressrange/6.3.0",
+      "hashPath": "ipaddressrange.6.3.0.nupkg.sha512"
     },
     "Microsoft.AspNetCore.Authentication.JwtBearer/8.0.11": {
       "type": "package",
@@ -350,26 +393,33 @@
       "path": "microsoft.aspnetcore.authentication.jwtbearer/8.0.11",
       "hashPath": "microsoft.aspnetcore.authentication.jwtbearer.8.0.11.nupkg.sha512"
     },
-    "Microsoft.AspNetCore.JsonPatch/8.0.0": {
+    "Microsoft.AspNetCore.JsonPatch/8.0.22": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-klQdb/9+j0u8MDjoqHEgDCPz8GRhfsbRVvZIM3glFqjs8uY7S1hS9RvKZuz8o4dS9NsEpFp4Jccd8CQuIYHK0g==",
-      "path": "microsoft.aspnetcore.jsonpatch/8.0.0",
-      "hashPath": "microsoft.aspnetcore.jsonpatch.8.0.0.nupkg.sha512"
+      "sha512": "sha512-gquk+JFVSXMJSHP/wWBgF6gYrwk616T6uJPaXvdXxBTRe43KTzuW0M+eMVlJsDH/lHGvItdjv47Y6uJ7WQVoSg==",
+      "path": "microsoft.aspnetcore.jsonpatch/8.0.22",
+      "hashPath": "microsoft.aspnetcore.jsonpatch.8.0.22.nupkg.sha512"
     },
-    "Microsoft.AspNetCore.MiddlewareAnalysis/8.0.0": {
+    "Microsoft.AspNetCore.MiddlewareAnalysis/8.0.22": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-Kw9LlAkglXH2ZJ7Ce90vhBwH+LaIk6M2RZmRDfiVLmjze5T/T4AFwdyZs9ToyXs9IqtDVSygex/uWNQCLR6NXQ==",
-      "path": "microsoft.aspnetcore.middlewareanalysis/8.0.0",
-      "hashPath": "microsoft.aspnetcore.middlewareanalysis.8.0.0.nupkg.sha512"
+      "sha512": "sha512-o3ntDd5INOweHlMwhezZOF/p3nyeVUvnGIEJHAXXUJ3JIOEg8HjmrAESvfai4mzFteZAsnojloxn0H5e+AbzHA==",
+      "path": "microsoft.aspnetcore.middlewareanalysis/8.0.22",
+      "hashPath": "microsoft.aspnetcore.middlewareanalysis.8.0.22.nupkg.sha512"
     },
-    "Microsoft.AspNetCore.Mvc.NewtonsoftJson/8.0.0": {
+    "Microsoft.AspNetCore.Mvc.NewtonsoftJson/8.0.22": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-/e5+eBvY759xiZJO+y1lHi4VzXqbDzTJSyCtKpaj3Ko2JAFQjiCOJ0ZHk2i4g4HpoSdXmzEXQsjr6dUX9U0/JA==",
-      "path": "microsoft.aspnetcore.mvc.newtonsoftjson/8.0.0",
-      "hashPath": "microsoft.aspnetcore.mvc.newtonsoftjson.8.0.0.nupkg.sha512"
+      "sha512": "sha512-jSMF5XkqtWvFyvyVJFKrgmGhMh1sDKzIHa+S4WVXa1AY/F0Wou+uFbjO1DPlHt/TWdsWhuhVI1nF0yqIgxRrKQ==",
+      "path": "microsoft.aspnetcore.mvc.newtonsoftjson/8.0.22",
+      "hashPath": "microsoft.aspnetcore.mvc.newtonsoftjson.8.0.22.nupkg.sha512"
+    },
+    "Microsoft.Extensions.DependencyInjection.Abstractions/8.0.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-3iE7UF7MQkCv1cxzCahz+Y/guQbTqieyxyaWKhrRO91itI9cOKO76OHeQDahqG4MmW5umr3CcCvGmK92lWNlbg==",
+      "path": "microsoft.extensions.dependencyinjection.abstractions/8.0.2",
+      "hashPath": "microsoft.extensions.dependencyinjection.abstractions.8.0.2.nupkg.sha512"
     },
     "Microsoft.Extensions.DependencyModel/8.0.0": {
       "type": "package",
@@ -441,12 +491,19 @@
       "path": "newtonsoft.json.bson/1.0.2",
       "hashPath": "newtonsoft.json.bson.1.0.2.nupkg.sha512"
     },
-    "Ocelot/21.0.0": {
+    "Ocelot/24.1.0": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-av6uL2OqeIEgyQmldlxA/qOgJHLaiXZMGOZW+PWqEDrK8kUOoUqJObkbCLM5PeIlZhmduVsqWULdBxe9kKhDxQ==",
-      "path": "ocelot/21.0.0",
-      "hashPath": "ocelot.21.0.0.nupkg.sha512"
+      "sha512": "sha512-M5CRBRU9B+zyFqAiPVIDSANSONumKdtDv7AZvAAuK3Sl39mP7FoknvhIxvbbqchq/x0xGialAvUDuEQZJ0T09Q==",
+      "path": "ocelot/24.1.0",
+      "hashPath": "ocelot.24.1.0.nupkg.sha512"
+    },
+    "Ocelot.Provider.Consul/24.1.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-d74SgDFWKXp5m9H1utAfNHzYZLmNnC9b8esFYZHXPa+EsO8VagY8yHnBhG+QX+YDf0xoLPdEVZryCn2V5L+fWQ==",
+      "path": "ocelot.provider.consul/24.1.0",
+      "hashPath": "ocelot.provider.consul.24.1.0.nupkg.sha512"
     },
     "Serilog/3.1.1": {
       "type": "package",

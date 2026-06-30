@@ -1,0 +1,171 @@
+[2026-06-30 12:28:16.284 +03:00] [INF] User profile is available. Using 'C:\Users\1\AppData\Local\ASP.NET\DataProtection-Keys' as key repository and Windows DPAPI to encrypt keys at rest.
+[2026-06-30 12:28:16.479 +03:00] [INF] Now listening on: http://localhost:5000
+[2026-06-30 12:28:16.482 +03:00] [INF] Application started. Press Ctrl+C to shut down.
+[2026-06-30 12:28:16.484 +03:00] [INF] Hosting environment: Production
+[2026-06-30 12:28:16.485 +03:00] [INF] Content root path: D:\Documents\שרי\לימודים\microservise\server\Gateway\ApiGateway
+[2026-06-30 12:28:57.829 +03:00] [INF] Request starting HTTP/1.1 GET http://localhost:5000/ - application/json 88
+[2026-06-30 12:28:57.933 +03:00] [WRN] Invalid Authorization header format for request: /
+[2026-06-30 12:28:57.994 +03:00] [INF] HTTP GET / responded 401 in 140.3893 ms
+[2026-06-30 12:28:58.000 +03:00] [INF] Request finished HTTP/1.1 GET http://localhost:5000/ - 401 null application/json; charset=utf-8 175.3389ms
+[2026-06-30 12:29:52.397 +03:00] [INF] Request starting HTTP/1.1 GET http://localhost:5000/catalog/products - application/json 88
+[2026-06-30 12:29:52.400 +03:00] [WRN] Invalid Authorization header format for request: /catalog/products
+[2026-06-30 12:29:52.402 +03:00] [INF] HTTP GET /catalog/products responded 401 in 2.2795 ms
+[2026-06-30 12:29:52.405 +03:00] [INF] Request finished HTTP/1.1 GET http://localhost:5000/catalog/products - 401 null application/json; charset=utf-8 8.5542ms
+[2026-06-30 12:30:03.974 +03:00] [INF] Request starting HTTP/1.1 GET http://localhost:5000/catalog/products - application/json 6
+[2026-06-30 12:30:03.977 +03:00] [WRN] Invalid Authorization header format for request: /catalog/products
+[2026-06-30 12:30:03.978 +03:00] [INF] HTTP GET /catalog/products responded 401 in 1.1519 ms
+[2026-06-30 12:30:03.980 +03:00] [INF] Request finished HTTP/1.1 GET http://localhost:5000/catalog/products - 401 null application/json; charset=utf-8 5.3979ms
+[2026-06-30 12:31:21.788 +03:00] [INF] Request starting HTTP/1.1 GET http://localhost:5000/catalog/products - null null
+[2026-06-30 12:31:21.790 +03:00] [INF] No Authorization header found for request: /catalog/products
+[2026-06-30 12:31:22.146 +03:00] [INF] RequestId: 0HNMMH81G360A:00000001, PreviousRequestId: -
+Rate limiting is disabled for route '/catalog/{everything}' via the EnableRateLimiting option.
+[2026-06-30 12:31:22.149 +03:00] [INF] RequestId: 0HNMMH81G360A:00000001, PreviousRequestId: -
+No authentication is required for the path '/catalog/products' in the route /catalog/{everything}.
+[2026-06-30 12:31:22.691 +03:00] [WRN] RequestId: 0HNMMH81G360A:00000001, PreviousRequestId: -
+404 Not Found status code of request URI: http://localhost:5002/api/products
+[2026-06-30 12:31:22.703 +03:00] [INF] HTTP GET /catalog/products responded 404 in 912.9577 ms
+[2026-06-30 12:31:22.706 +03:00] [INF] Request finished HTTP/1.1 GET http://localhost:5000/catalog/products - 404 0 null 918.5427ms
+[2026-06-30 12:31:22.709 +03:00] [INF] Request reached the end of the middleware pipeline without being handled by application code. Request path: GET http://localhost:5000/catalog/products, Response status code: 404
+[2026-06-30 12:31:22.888 +03:00] [INF] Request starting HTTP/1.1 GET http://localhost:5000/favicon.ico - null null
+[2026-06-30 12:31:22.891 +03:00] [INF] No Authorization header found for request: /favicon.ico
+[2026-06-30 12:31:22.896 +03:00] [WRN] RequestId: 0HNMMH81G360A:00000002, PreviousRequestId: -
+DownstreamRouteFinderMiddleware setting pipeline errors because DownstreamRouteFinder returned the following ->
+UnableToFindDownstreamRouteError: Failed to match route configuration for upstream: GET /favicon.ico
+[2026-06-30 12:31:22.898 +03:00] [WRN] RequestId: 0HNMMH81G360A:00000002, PreviousRequestId: -
+ResponderMiddleware found 1 error ->
+UnableToFindDownstreamRouteError: Failed to match route configuration for upstream: GET /favicon.ico
+Setting error response for request: GET /favicon.ico
+[2026-06-30 12:31:22.900 +03:00] [INF] HTTP GET /favicon.ico responded 404 in 9.5436 ms
+[2026-06-30 12:31:22.902 +03:00] [INF] Request finished HTTP/1.1 GET http://localhost:5000/favicon.ico - 404 0 null 14.4961ms
+[2026-06-30 13:19:07.944 +03:00] [INF] Request starting HTTP/1.1 POST http://localhost:5000/catalog/products - application/json 66
+[2026-06-30 13:19:08.129 +03:00] [INF] JWT token validated successfully for request: /catalog/products
+[2026-06-30 13:19:08.148 +03:00] [INF] RequestId: 0HNMMH81G360C:00000001, PreviousRequestId: -
+Rate limiting is disabled for route '/catalog/{everything}' via the EnableRateLimiting option.
+[2026-06-30 13:19:08.150 +03:00] [INF] RequestId: 0HNMMH81G360C:00000001, PreviousRequestId: -
+No authentication is required for the path '/catalog/products' in the route /catalog/{everything}.
+[2026-06-30 13:19:08.446 +03:00] [WRN] RequestId: 0HNMMH81G360C:00000001, PreviousRequestId: -
+404 Not Found status code of request URI: http://localhost:5002/api/products
+[2026-06-30 13:19:08.447 +03:00] [INF] HTTP POST /catalog/products responded 404 in 493.6514 ms
+[2026-06-30 13:19:08.449 +03:00] [INF] Request finished HTTP/1.1 POST http://localhost:5000/catalog/products - 404 0 null 505.4838ms
+[2026-06-30 13:19:08.452 +03:00] [INF] Request reached the end of the middleware pipeline without being handled by application code. Request path: POST http://localhost:5000/catalog/products, Response status code: 404
+[2026-06-30 13:19:16.395 +03:00] [INF] Request starting HTTP/1.1 GET http://localhost:5000/catalog/products - application/json 66
+[2026-06-30 13:19:16.397 +03:00] [INF] JWT token validated successfully for request: /catalog/products
+[2026-06-30 13:19:16.399 +03:00] [INF] RequestId: 0HNMMH81G360C:00000002, PreviousRequestId: -
+Rate limiting is disabled for route '/catalog/{everything}' via the EnableRateLimiting option.
+[2026-06-30 13:19:16.400 +03:00] [INF] RequestId: 0HNMMH81G360C:00000002, PreviousRequestId: -
+No authentication is required for the path '/catalog/products' in the route /catalog/{everything}.
+[2026-06-30 13:19:16.408 +03:00] [WRN] RequestId: 0HNMMH81G360C:00000002, PreviousRequestId: -
+404 Not Found status code of request URI: http://localhost:5002/api/products
+[2026-06-30 13:19:16.410 +03:00] [INF] HTTP GET /catalog/products responded 404 in 12.9008 ms
+[2026-06-30 13:19:16.412 +03:00] [INF] Request finished HTTP/1.1 GET http://localhost:5000/catalog/products - 404 0 null 16.8208ms
+[2026-06-30 13:19:16.415 +03:00] [INF] Request reached the end of the middleware pipeline without being handled by application code. Request path: GET http://localhost:5000/catalog/products, Response status code: 404
+[2026-06-30 13:20:45.506 +03:00] [INF] Request starting HTTP/1.1 POST http://localhost:5000/catalog/categories - application/json 81
+[2026-06-30 13:20:45.510 +03:00] [INF] JWT token validated successfully for request: /catalog/categories
+[2026-06-30 13:20:45.511 +03:00] [INF] RequestId: 0HNMMH81G360E:00000001, PreviousRequestId: -
+Rate limiting is disabled for route '/catalog/{everything}' via the EnableRateLimiting option.
+[2026-06-30 13:20:45.513 +03:00] [INF] RequestId: 0HNMMH81G360E:00000001, PreviousRequestId: -
+No authentication is required for the path '/catalog/categories' in the route /catalog/{everything}.
+[2026-06-30 13:20:47.129 +03:00] [INF] RequestId: 0HNMMH81G360E:00000001, PreviousRequestId: -
+201 Created status code of request URI: http://localhost:5002/api/categories
+[2026-06-30 13:20:47.141 +03:00] [INF] HTTP POST /catalog/categories responded 201 in 1632.1703 ms
+[2026-06-30 13:20:47.143 +03:00] [INF] Request finished HTTP/1.1 POST http://localhost:5000/catalog/categories - 201 null application/json; charset=utf-8 1637.5818ms
+[2026-06-30 13:20:47.146 +03:00] [INF] Request reached the end of the middleware pipeline without being handled by application code. Request path: POST http://localhost:5000/catalog/categories, Response status code: 201
+[2026-06-30 13:20:52.746 +03:00] [INF] Request starting HTTP/1.1 GET http://localhost:5000/catalog/categories - application/json 81
+[2026-06-30 13:20:52.748 +03:00] [INF] JWT token validated successfully for request: /catalog/categories
+[2026-06-30 13:20:52.750 +03:00] [INF] RequestId: 0HNMMH81G360E:00000002, PreviousRequestId: -
+Rate limiting is disabled for route '/catalog/{everything}' via the EnableRateLimiting option.
+[2026-06-30 13:20:52.750 +03:00] [INF] RequestId: 0HNMMH81G360E:00000002, PreviousRequestId: -
+No authentication is required for the path '/catalog/categories' in the route /catalog/{everything}.
+[2026-06-30 13:20:53.159 +03:00] [INF] RequestId: 0HNMMH81G360E:00000002, PreviousRequestId: -
+200 OK status code of request URI: http://localhost:5002/api/categories
+[2026-06-30 13:20:53.168 +03:00] [INF] HTTP GET /catalog/categories responded 200 in 419.6077 ms
+[2026-06-30 13:20:53.171 +03:00] [INF] Request finished HTTP/1.1 GET http://localhost:5000/catalog/categories - 200 null application/json; charset=utf-8 425.2853ms
+[2026-06-30 13:20:53.177 +03:00] [INF] Request reached the end of the middleware pipeline without being handled by application code. Request path: GET http://localhost:5000/catalog/categories, Response status code: 200
+[2026-06-30 14:38:08.162 +03:00] [INF] User profile is available. Using 'C:\Users\1\AppData\Local\ASP.NET\DataProtection-Keys' as key repository and Windows DPAPI to encrypt keys at rest.
+[2026-06-30 14:38:08.525 +03:00] [INF] Now listening on: http://localhost:5000
+[2026-06-30 14:38:08.542 +03:00] [INF] Application started. Press Ctrl+C to shut down.
+[2026-06-30 14:38:08.544 +03:00] [INF] Hosting environment: Production
+[2026-06-30 14:38:08.582 +03:00] [INF] Content root path: D:\Documents\שרי\לימודים\microservise\server\Gateway\ApiGateway
+[2026-06-30 14:39:35.007 +03:00] [INF] Request starting HTTP/1.1 GET http://localhost:5000/health - null null
+[2026-06-30 14:39:35.079 +03:00] [INF] No Authorization header found for request: /health
+[2026-06-30 14:39:35.149 +03:00] [WRN] RequestId: 0HNMMJH15PTOI:00000001, PreviousRequestId: -
+DownstreamRouteFinderMiddleware setting pipeline errors because DownstreamRouteFinder returned the following ->
+UnableToFindDownstreamRouteError: Failed to match route configuration for upstream: GET /health
+[2026-06-30 14:39:35.152 +03:00] [WRN] RequestId: 0HNMMJH15PTOI:00000001, PreviousRequestId: -
+ResponderMiddleware found 1 error ->
+UnableToFindDownstreamRouteError: Failed to match route configuration for upstream: GET /health
+Setting error response for request: GET /health
+[2026-06-30 14:39:35.157 +03:00] [INF] HTTP GET /health responded 404 in 138.5799 ms
+[2026-06-30 14:39:35.163 +03:00] [INF] Request finished HTTP/1.1 GET http://localhost:5000/health - 404 0 null 157.1151ms
+[2026-06-30 14:39:35.172 +03:00] [INF] Request starting HTTP/1.1 GET http://localhost:5000/swagger/index.html - null null
+[2026-06-30 14:39:35.176 +03:00] [INF] No Authorization header found for request: /swagger/index.html
+[2026-06-30 14:39:35.180 +03:00] [WRN] RequestId: 0HNMMJH15PTOI:00000002, PreviousRequestId: -
+DownstreamRouteFinderMiddleware setting pipeline errors because DownstreamRouteFinder returned the following ->
+UnableToFindDownstreamRouteError: Failed to match route configuration for upstream: GET /swagger/index.html
+[2026-06-30 14:39:35.180 +03:00] [WRN] RequestId: 0HNMMJH15PTOI:00000002, PreviousRequestId: -
+ResponderMiddleware found 1 error ->
+UnableToFindDownstreamRouteError: Failed to match route configuration for upstream: GET /swagger/index.html
+Setting error response for request: GET /swagger/index.html
+[2026-06-30 14:39:35.181 +03:00] [INF] HTTP GET /swagger/index.html responded 404 in 5.3762 ms
+[2026-06-30 14:39:35.183 +03:00] [INF] Request finished HTTP/1.1 GET http://localhost:5000/swagger/index.html - 404 0 null 10.9126ms
+[2026-06-30 14:39:36.149 +03:00] [INF] Request starting HTTP/1.1 GET http://localhost:5000/catalog - null null
+[2026-06-30 14:39:36.151 +03:00] [INF] No Authorization header found for request: /catalog
+[2026-06-30 14:39:36.203 +03:00] [INF] RequestId: 0HNMMJH15PTOI:00000003, PreviousRequestId: -
+Rate limiting is disabled for route '/catalog/{everything}' via the EnableRateLimiting option.
+[2026-06-30 14:39:36.218 +03:00] [INF] RequestId: 0HNMMJH15PTOI:00000003, PreviousRequestId: -
+No authentication is required for the path '/catalog' in the route /catalog/{everything}.
+[2026-06-30 14:39:36.317 +03:00] [WRN] RequestId: 0HNMMJH15PTOI:00000003, PreviousRequestId: -
+404 Not Found status code of request URI: http://localhost:5002/api
+[2026-06-30 14:39:36.329 +03:00] [INF] HTTP GET /catalog responded 404 in 177.9871 ms
+[2026-06-30 14:39:36.331 +03:00] [INF] Request finished HTTP/1.1 GET http://localhost:5000/catalog - 404 0 null 182.507ms
+[2026-06-30 14:39:36.334 +03:00] [INF] Request reached the end of the middleware pipeline without being handled by application code. Request path: GET http://localhost:5000/catalog, Response status code: 404
+[2026-06-30 14:39:36.339 +03:00] [INF] Request starting HTTP/1.1 GET http://localhost:5000/orders - null null
+[2026-06-30 14:39:36.342 +03:00] [INF] No Authorization header found for request: /orders
+[2026-06-30 14:39:36.343 +03:00] [INF] RequestId: 0HNMMJH15PTOI:00000004, PreviousRequestId: -
+Rate limiting is disabled for route '/orders/{everything}' via the EnableRateLimiting option.
+[2026-06-30 14:39:36.345 +03:00] [INF] RequestId: 0HNMMJH15PTOI:00000004, PreviousRequestId: -
+The path '/orders' is an authenticated route! AuthenticationMiddleware checking if client is authenticated...
+[2026-06-30 14:39:36.347 +03:00] [WRN] RequestId: 0HNMMJH15PTOI:00000004, PreviousRequestId: -
+Client has NOT been authenticated for path '/orders' and pipeline error set. UnauthenticatedError: Request for authenticated route '/orders' was unauthenticated!;
+[2026-06-30 14:39:36.348 +03:00] [WRN] RequestId: 0HNMMJH15PTOI:00000004, PreviousRequestId: -
+ResponderMiddleware found 1 error ->
+UnauthenticatedError: Request for authenticated route '/orders' was unauthenticated!
+Setting error response for request: GET /orders
+[2026-06-30 14:39:36.349 +03:00] [INF] HTTP GET /orders responded 401 in 7.3619 ms
+[2026-06-30 14:39:36.350 +03:00] [INF] Request finished HTTP/1.1 GET http://localhost:5000/orders - 401 0 null 10.9556ms
+[2026-06-30 14:39:36.355 +03:00] [INF] Request starting HTTP/1.1 GET http://localhost:5000/lottery - null null
+[2026-06-30 14:39:36.357 +03:00] [INF] No Authorization header found for request: /lottery
+[2026-06-30 14:39:36.358 +03:00] [INF] RequestId: 0HNMMJH15PTOI:00000005, PreviousRequestId: -
+Rate limiting is disabled for route '/lottery/{everything}' via the EnableRateLimiting option.
+[2026-06-30 14:39:36.359 +03:00] [INF] RequestId: 0HNMMJH15PTOI:00000005, PreviousRequestId: -
+The path '/lottery' is an authenticated route! AuthenticationMiddleware checking if client is authenticated...
+[2026-06-30 14:39:36.360 +03:00] [WRN] RequestId: 0HNMMJH15PTOI:00000005, PreviousRequestId: -
+Client has NOT been authenticated for path '/lottery' and pipeline error set. UnauthenticatedError: Request for authenticated route '/lottery' was unauthenticated!;
+[2026-06-30 14:39:36.361 +03:00] [WRN] RequestId: 0HNMMJH15PTOI:00000005, PreviousRequestId: -
+ResponderMiddleware found 1 error ->
+UnauthenticatedError: Request for authenticated route '/lottery' was unauthenticated!
+Setting error response for request: GET /lottery
+[2026-06-30 14:39:36.362 +03:00] [INF] HTTP GET /lottery responded 401 in 4.9282 ms
+[2026-06-30 14:39:36.363 +03:00] [INF] Request finished HTTP/1.1 GET http://localhost:5000/lottery - 401 0 null 8.2752ms
+[2026-06-30 14:40:14.441 +03:00] [INF] Request starting HTTP/1.1 GET http://localhost:5000/swagger/index.html - null null
+[2026-06-30 14:40:14.444 +03:00] [INF] No Authorization header found for request: /swagger/index.html
+[2026-06-30 14:40:14.445 +03:00] [WRN] RequestId: 0HNMMJH15PTOK:00000001, PreviousRequestId: -
+DownstreamRouteFinderMiddleware setting pipeline errors because DownstreamRouteFinder returned the following ->
+UnableToFindDownstreamRouteError: Failed to match route configuration for upstream: GET /swagger/index.html
+[2026-06-30 14:40:14.446 +03:00] [WRN] RequestId: 0HNMMJH15PTOK:00000001, PreviousRequestId: -
+ResponderMiddleware found 1 error ->
+UnableToFindDownstreamRouteError: Failed to match route configuration for upstream: GET /swagger/index.html
+Setting error response for request: GET /swagger/index.html
+[2026-06-30 14:40:14.447 +03:00] [INF] HTTP GET /swagger/index.html responded 404 in 2.8413 ms
+[2026-06-30 14:40:14.448 +03:00] [INF] Request finished HTTP/1.1 GET http://localhost:5000/swagger/index.html - 404 0 null 6.7839ms
+[2026-06-30 14:41:04.056 +03:00] [INF] Request starting HTTP/1.1 GET http://localhost:5000/catalog/api/products - null null
+[2026-06-30 14:41:04.059 +03:00] [INF] No Authorization header found for request: /catalog/api/products
+[2026-06-30 14:41:04.061 +03:00] [INF] RequestId: 0HNMMJH15PTOK:00000002, PreviousRequestId: -
+Rate limiting is disabled for route '/catalog/{everything}' via the EnableRateLimiting option.
+[2026-06-30 14:41:04.062 +03:00] [INF] RequestId: 0HNMMJH15PTOK:00000002, PreviousRequestId: -
+No authentication is required for the path '/catalog/api/products' in the route /catalog/{everything}.
+[2026-06-30 14:41:04.071 +03:00] [WRN] RequestId: 0HNMMJH15PTOK:00000002, PreviousRequestId: -
+404 Not Found status code of request URI: http://localhost:5002/api/api/products
+[2026-06-30 14:41:04.073 +03:00] [INF] HTTP GET /catalog/api/products responded 404 in 14.2339 ms
+[2026-06-30 14:41:04.075 +03:00] [INF] Request finished HTTP/1.1 GET http://localhost:5000/catalog/api/products - 404 0 null 18.6568ms
+[2026-06-30 14:41:04.078 +03:00] [INF] Request reached the end of the middleware pipeline without being handled by application code. Request path: GET http://localhost:5000/catalog/api/products, Response status code: 404

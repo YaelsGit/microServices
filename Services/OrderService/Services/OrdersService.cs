@@ -153,7 +153,7 @@ public class OrdersService : IOrdersService
     /// Cancel order
     /// Business logic: Only allow cancellation of pending orders
     /// </summary>
-    public async Task<bool> CancelOrderAsync(int orderId)
+    public async Task<(bool Success, string Message)> CancelOrderAsync(int orderId)
     {
         try
         {
@@ -161,14 +161,14 @@ public class OrdersService : IOrdersService
             if (order == null)
             {
                 _logger.LogWarning($"Cancel order attempt for non-existent order: {orderId}");
-                return false;
+                return (false, "Order not found");
             }
 
             // Business logic: Only cancel if pending
             if (order.Status != "pending")
             {
                 _logger.LogWarning($"Cannot cancel order with status '{order.Status}': {orderId}");
-                return false;
+                return (false, $"Cannot cancel order with status '{order.Status}'");
             }
 
             // Update order status
@@ -179,14 +179,15 @@ public class OrdersService : IOrdersService
             {
                 _logger.LogInformation($"Order cancelled: {orderId}");
                 // TODO: Restore gift quantity in CatalogService
+                return (true, "Order cancelled successfully");
             }
 
-            return success;
+            return (false, "Failed to cancel order");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, $"Error cancelling order: {orderId}");
-            throw;
+            return (false, "An error occurred while cancelling the order");
         }
     }
 

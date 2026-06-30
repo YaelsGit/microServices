@@ -13,6 +13,7 @@ public interface IGiftsService
     Task<int> CreateGiftAsync(DtoCreateGiftRequest request);
     Task<bool> UpdateGiftAsync(int giftId, DtoUpdateGiftRequest request);
     Task<bool> DeleteGiftAsync(int giftId);
+    Task<bool> UpdateGiftQuantityAsync(int giftId, int quantityChange);
     Task<IEnumerable<DtoGifts>> GetGiftsByPriceRangeAsync(decimal minPrice, decimal maxPrice);
     Task<IEnumerable<DtoGifts>> GetFilteredGiftsAsync(DtoGiftFilter filter);
 }

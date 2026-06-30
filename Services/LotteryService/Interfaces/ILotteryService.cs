@@ -8,7 +8,7 @@ namespace LotteryService.Interfaces;
 /// </summary>
 public interface ILotteryService
 {
-    Task<bool> CreateLotteryTicketAsync(int userId, int giftId);
+    Task<(bool Success, int TicketId, string Message)> CreateLotteryTicketAsync(int userId, int giftId);
     Task<(bool Success, int WinningTicketCount, string Message)> RunLotteryAsync();
     Task<IEnumerable<DtoLotteryWinner>> GetWinnersAsync();
     Task<IEnumerable<DtoLottery>> GetUserLotteryTicketsAsync(int userId);

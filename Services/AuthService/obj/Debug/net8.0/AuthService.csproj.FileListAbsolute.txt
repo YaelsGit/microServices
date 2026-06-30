@@ -8,6 +8,7 @@ D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\bin\
 D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\bin\Debug\net8.0\AuthService.pdb
 D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\bin\Debug\net8.0\Azure.Core.dll
 D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\bin\Debug\net8.0\Azure.Identity.dll
+D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\bin\Debug\net8.0\BCrypt-Net-Next.dll
 D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\bin\Debug\net8.0\Humanizer.dll
 D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\bin\Debug\net8.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
 D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\bin\Debug\net8.0\Microsoft.Bcl.AsyncInterfaces.dll
@@ -174,6 +175,7 @@ D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\obj\
 D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\obj\Debug\net8.0\AuthService.csproj.CoreCompileInputs.cache
 D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\obj\Debug\net8.0\AuthService.MvcApplicationPartsAssemblyInfo.cs
 D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\obj\Debug\net8.0\AuthService.MvcApplicationPartsAssemblyInfo.cache
+D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\obj\Debug\net8.0\AuthService.sourcelink.json
 D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\obj\Debug\net8.0\rjimswa.dswa.cache.json
 D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\obj\Debug\net8.0\rjsmrazor.dswa.cache.json
 D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\obj\Debug\net8.0\rjsmcshtml.dswa.cache.json
@@ -189,4 +191,3 @@ D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\obj\
 D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\obj\Debug\net8.0\AuthService.pdb
 D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\obj\Debug\net8.0\AuthService.genruntimeconfig.cache
 D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\obj\Debug\net8.0\ref\AuthService.dll
-D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\bin\Debug\net8.0\BCrypt-Net-Next.dll

@@ -6,6 +6,7 @@ D:\Documents\שרי\לימודים\microservise\server\Shared\SharedModels\obj\D
 D:\Documents\שרי\לימודים\microservise\server\Shared\SharedModels\obj\Debug\net8.0\SharedModels.AssemblyInfoInputs.cache
 D:\Documents\שרי\לימודים\microservise\server\Shared\SharedModels\obj\Debug\net8.0\SharedModels.AssemblyInfo.cs
 D:\Documents\שרי\לימודים\microservise\server\Shared\SharedModels\obj\Debug\net8.0\SharedModels.csproj.CoreCompileInputs.cache
+D:\Documents\שרי\לימודים\microservise\server\Shared\SharedModels\obj\Debug\net8.0\SharedModels.sourcelink.json
 D:\Documents\שרי\לימודים\microservise\server\Shared\SharedModels\obj\Debug\net8.0\SharedModels.dll
 D:\Documents\שרי\לימודים\microservise\server\Shared\SharedModels\obj\Debug\net8.0\refint\SharedModels.dll
 D:\Documents\שרי\לימודים\microservise\server\Shared\SharedModels\obj\Debug\net8.0\SharedModels.pdb

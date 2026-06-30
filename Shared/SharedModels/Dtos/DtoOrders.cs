@@ -16,6 +16,7 @@ public class DtoOrders
 
 public class DtoCreateOrderRequest
 {
+    public int UserId { get; set; }
     public int GiftId { get; set; }
     public int Quantity { get; set; }
 }

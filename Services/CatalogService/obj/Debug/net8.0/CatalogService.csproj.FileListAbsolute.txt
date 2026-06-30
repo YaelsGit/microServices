@@ -54,6 +54,7 @@ D:\Documents\שרי\לימודים\microservise\server\Services\CatalogService\b
 D:\Documents\שרי\לימודים\microservise\server\Services\CatalogService\bin\Debug\net8.0\Mono.TextTemplating.dll
 D:\Documents\שרי\לימודים\microservise\server\Services\CatalogService\bin\Debug\net8.0\Polly.dll
 D:\Documents\שרי\לימודים\microservise\server\Services\CatalogService\bin\Debug\net8.0\Polly.Core.dll
+D:\Documents\שרי\לימודים\microservise\server\Services\CatalogService\bin\Debug\net8.0\Polly.Extensions.Http.dll
 D:\Documents\שרי\לימודים\microservise\server\Services\CatalogService\bin\Debug\net8.0\Serilog.dll
 D:\Documents\שרי\לימודים\microservise\server\Services\CatalogService\bin\Debug\net8.0\Serilog.AspNetCore.dll
 D:\Documents\שרי\לימודים\microservise\server\Services\CatalogService\bin\Debug\net8.0\Serilog.Extensions.Hosting.dll
@@ -174,6 +175,7 @@ D:\Documents\שרי\לימודים\microservise\server\Services\CatalogService\o
 D:\Documents\שרי\לימודים\microservise\server\Services\CatalogService\obj\Debug\net8.0\CatalogService.csproj.CoreCompileInputs.cache
 D:\Documents\שרי\לימודים\microservise\server\Services\CatalogService\obj\Debug\net8.0\CatalogService.MvcApplicationPartsAssemblyInfo.cs
 D:\Documents\שרי\לימודים\microservise\server\Services\CatalogService\obj\Debug\net8.0\CatalogService.MvcApplicationPartsAssemblyInfo.cache
+D:\Documents\שרי\לימודים\microservise\server\Services\CatalogService\obj\Debug\net8.0\CatalogService.sourcelink.json
 D:\Documents\שרי\לימודים\microservise\server\Services\CatalogService\obj\Debug\net8.0\rjimswa.dswa.cache.json
 D:\Documents\שרי\לימודים\microservise\server\Services\CatalogService\obj\Debug\net8.0\rjsmrazor.dswa.cache.json
 D:\Documents\שרי\לימודים\microservise\server\Services\CatalogService\obj\Debug\net8.0\rjsmcshtml.dswa.cache.json

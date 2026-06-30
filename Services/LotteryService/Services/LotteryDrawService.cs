@@ -35,7 +35,7 @@ public class LotteryDrawService : ILotteryService
     /// Create lottery ticket for a user
     /// Business logic: Validate user and gift exist
     /// </summary>
-    public async Task<bool> CreateLotteryTicketAsync(int userId, int giftId)
+    public async Task<(bool Success, int TicketId, string Message)> CreateLotteryTicketAsync(int userId, int giftId)
     {
         try
         {
@@ -46,7 +46,7 @@ public class LotteryDrawService : ILotteryService
             if (!userExists)
             {
                 _logger.LogWarning($"Lottery ticket creation for non-existent user: {userId}");
-                return false;
+                return (false, 0, "User not found");
             }
 
             // Validate gift exists
@@ -54,7 +54,7 @@ public class LotteryDrawService : ILotteryService
             if (!giftFound)
             {
                 _logger.LogWarning($"Lottery ticket creation for non-existent gift: {giftId}");
-                return false;
+                return (false, 0, "Gift not found");
             }
 
             // Create lottery entry
@@ -67,12 +67,12 @@ public class LotteryDrawService : ILotteryService
 
             var lotteryId = await _repository.CreateLotteryAsync(lottery);
             _logger.LogInformation($"Lottery ticket created: {lotteryId}");
-            return true;
+            return (true, lotteryId, "Lottery ticket created successfully");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, $"Error creating lottery ticket for user: {userId}");
-            return false;
+            return (false, 0, "An error occurred while creating the lottery ticket");
         }
     }
 

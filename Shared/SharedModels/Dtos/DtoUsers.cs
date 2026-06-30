@@ -43,3 +43,8 @@ public class DtoChangePasswordRequest
     public string OldPassword { get; set; } = string.Empty;
     public string NewPassword { get; set; } = string.Empty;
 }
+
+public class DtoValidateTokenRequest
+{
+    public string Token { get; set; } = string.Empty;
+}

@@ -1,68 +1,249 @@
 using Serilog;
 using Microsoft.EntityFrameworkCore;
+using OrderService.Data;
+using OrderService.Repository;
+using OrderService.Services;
+using OrderService.Interfaces;
+using OrderService.Middleware;
+using OrderService.Extensions;
+using OrderService.HttpClients;
+using SharedModels.Utilities;
+using Microsoft.OpenApi.Models;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Http.Resilience;
+using Polly;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add Serilog
+// ============ SERILOG CONFIGURATION ============
 builder.Host.UseSerilog((context, config) =>
-    config.WriteTo.Console()
-        .WriteTo.File("logs/order-service-.txt", rollingInterval: RollingInterval.Day)
+{
+    config
+        .MinimumLevel.Information()
+        .WriteTo.Console()
+        .WriteTo.File(
+            "logs/order-service-.txt",
+            rollingInterval: RollingInterval.Day,
+            outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level}] {Message:lj}{NewLine}{Exception}"
+        )
+        .Enrich.FromLogContext();
+});
+
+// ============ DATABASE CONFIGURATION ============
+builder.Services.AddDbContext<OrderDbContext>(options =>
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        sqlOptions => sqlOptions.CommandTimeout(30)
+    )
 );
 
-// Add services to the container
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+// ============ DEPENDENCY INJECTION ============
+// Repositories
+builder.Services.AddScoped<IOrdersRepository, OrdersRepository>();
 
-// Add Entity Framework DbContext
-builder.Services.AddDbContext<OrderService.Data.OrderDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
-);
+// Services
+builder.Services.AddScoped<IOrdersService, OrdersService>();
 
-// Add CORS
+// Utilities
+builder.Services.AddSingleton<JwtTokenService>();
+
+// ============ HTTP CLIENT CONFIGURATION WITH POLLY RESILIENCE ============
+// AuthService HTTP Client with resilience policies
+builder.Services.AddHttpClient<AuthServiceClient>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Services:AuthService:Url"] ?? "http://localhost:5001");
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+    client.Timeout = TimeSpan.FromSeconds(5);
+})
+    .AddResilienceHandler("auth-service-resilience", builder =>
+    {
+        // Retry policy with exponential backoff
+        builder.AddRetry(new HttpRetryStrategyOptions
+        {
+            MaxRetryAttempts = 3,
+            BackoffType = DelayBackoffType.Exponential,
+            Delay = TimeSpan.FromSeconds(2),
+            ShouldHandle = args => args.Outcome switch
+            {
+                { Exception: HttpRequestException } => PredicateResult.True(),
+                { Result.StatusCode: System.Net.HttpStatusCode.RequestTimeout } => PredicateResult.True(),
+                { Result.StatusCode: >= System.Net.HttpStatusCode.InternalServerError } => PredicateResult.True(),
+                _ => PredicateResult.False(),
+            }
+        });
+        
+        // Circuit breaker policy
+        builder.AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions
+        {
+            FailureRatio = 0.5,
+            MinimumThroughput = 5,
+            SamplingDuration = TimeSpan.FromSeconds(30),
+            BreakDuration = TimeSpan.FromSeconds(30),
+            ShouldHandle = args => args.Outcome switch
+            {
+                { Exception: HttpRequestException } => PredicateResult.True(),
+                { Result.StatusCode: >= System.Net.HttpStatusCode.InternalServerError } => PredicateResult.True(),
+                _ => PredicateResult.False(),
+            }
+        });
+    });
+
+// CatalogService HTTP Client with resilience policies
+builder.Services.AddHttpClient<CatalogServiceClient>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Services:CatalogService:Url"] ?? "http://localhost:5002");
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+    client.Timeout = TimeSpan.FromSeconds(5);
+})
+    .AddResilienceHandler("catalog-service-resilience", builder =>
+    {
+        // Retry policy with exponential backoff
+        builder.AddRetry(new HttpRetryStrategyOptions
+        {
+            MaxRetryAttempts = 3,
+            BackoffType = DelayBackoffType.Exponential,
+            Delay = TimeSpan.FromSeconds(2),
+            ShouldHandle = args => args.Outcome switch
+            {
+                { Exception: HttpRequestException } => PredicateResult.True(),
+                { Result.StatusCode: System.Net.HttpStatusCode.RequestTimeout } => PredicateResult.True(),
+                { Result.StatusCode: >= System.Net.HttpStatusCode.InternalServerError } => PredicateResult.True(),
+                _ => PredicateResult.False(),
+            }
+        });
+        
+        // Circuit breaker policy
+        builder.AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions
+        {
+            FailureRatio = 0.5,
+            MinimumThroughput = 5,
+            SamplingDuration = TimeSpan.FromSeconds(30),
+            BreakDuration = TimeSpan.FromSeconds(30),
+            ShouldHandle = args => args.Outcome switch
+            {
+                { Exception: HttpRequestException } => PredicateResult.True(),
+                { Result.StatusCode: >= System.Net.HttpStatusCode.InternalServerError } => PredicateResult.True(),
+                _ => PredicateResult.False(),
+            }
+        });
+    });
+
+// ============ CORS CONFIGURATION ============
 builder.Services.AddCors(options =>
 {
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy
+            .AllowAnyOrigin()
+            .AllowAnyMethod()
+            .AllowAnyHeader();
+    });
+
     options.AddPolicy("AllowAngularApp", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy
+            .WithOrigins("http://localhost:4200", "https://localhost:4200")
             .AllowAnyMethod()
             .AllowAnyHeader();
     });
 });
 
-// Add Authentication
+// ============ AUTHENTICATION & AUTHORIZATION ============
+var jwtSecretKey = builder.Configuration["Jwt:SecretKey"] ?? "your-secret-key-min-32-characters-required-here";
+
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", options =>
     {
-        options.Authority = "https://localhost:5001"; // Auth service
         options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
         {
-            ValidateAudience = false,
-            ValidIssuer = "AuthService",
+            ValidateIssuerSigningKey = true,
             IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
-                System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Jwt:SecretKey"] ?? "your-secret-key-here"))
+                System.Text.Encoding.UTF8.GetBytes(jwtSecretKey)
+            ),
+            ValidateIssuer = true,
+            ValidIssuer = "AuthService",
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(5)
         };
     });
 
 builder.Services.AddAuthorization();
 
-// Add HttpClientFactory for inter-service communication
-builder.Services.AddHttpClient();
+// ============ API DOCUMENTATION ============
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "OrderService API",
+        Version = "v1",
+        Description = "Order Management Service with inter-service resilience"
+    });
+
+    // Add JWT Bearer authentication scheme to Swagger
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        Description = "JWT Authorization header using the Bearer scheme"
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] { }
+        }
+    });
+});
+
+// ============ CONTROLLERS ============
+builder.Services.AddControllers();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+// ============ MIDDLEWARE PIPELINE ============
+// Correlation ID middleware (must be first)
+app.UseMiddleware<CorrelationIdMiddleware>();
 
+// Global exception handling middleware
+app.UseMiddleware<GlobalExceptionMiddleware>();
+
+// Logging
+app.UseSerilogRequestLogging();
+
+// HTTPS redirection
 app.UseHttpsRedirection();
-app.UseCors("AllowAngularApp");
+
+// CORS
+app.UseCors("AllowAll");
+
+// Authentication & Authorization
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Swagger/OpenAPI
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "OrderService API v1");
+        options.RoutePrefix = "swagger";
+    });
+}
+
+// Map controllers
 app.MapControllers();
 
 app.Run("http://localhost:5003");

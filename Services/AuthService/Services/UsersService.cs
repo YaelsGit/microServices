@@ -9,10 +9,10 @@ namespace AuthService.Services;
 
 /// <summary>
 /// Service implementation for user authentication and authorization
-/// Implements IAuthService interface from SharedModels
+/// Implements IAuthService interface from SharedModels and IUsersService for local injection
 /// Handles password hashing, JWT generation, and authentication logic
 /// </summary>
-public class UsersService : IAuthService
+public class UsersService : IAuthService, IUsersService
 {
     private readonly IUsersRepository _repository;
     private readonly JwtTokenService _jwtTokenService;
