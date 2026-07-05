@@ -1,5 +1,9 @@
-using MassTransit;
+﻿using MassTransit;
 using SharedModels.Events;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Threading.Tasks;
+using Serilog.Context; // 🌟 חובה להוסיף את זה למעלה!
 
 namespace NotificationService.Consumers;
 
@@ -20,18 +24,25 @@ public class OrderCancelledConsumer : IConsumer<OrderCancelled>
     public async Task Consume(ConsumeContext<OrderCancelled> context)
     {
         var message = context.Message;
-        _logger.LogWarning($"[OrderCancelledConsumer] Received OrderCancelled event for Order: {message.OrderId}, User: {message.UserId}, Reason: {message.Reason}");
+        
+        // 🌟 חילוץ ה-CorrelationId והזרקה שלו ללוגים של הריצה הנוכחית
+        var correlationId = context.CorrelationId ?? message.OrderId;
 
-        try
+        using (Serilog.Context.LogContext.PushProperty("CorrelationId", correlationId))
         {
-            // Simulate sending cancellation email
-            await SendCancellationEmailAsync(message.OrderId, message.UserId, message.Reason);
-            _logger.LogInformation($"[OrderCancelledConsumer] Cancellation email sent for Order: {message.OrderId}");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, $"[OrderCancelledConsumer] Error sending cancellation email for Order: {message.OrderId}");
-            // Don't throw - email failures shouldn't fail the saga
+            _logger.LogWarning($"[OrderCancelledConsumer] Received OrderCancelled event for Order: {message.OrderId}, User: {message.UserId}, Reason: {message.Reason}");
+
+            try
+            {
+                // Simulate sending cancellation email
+                await SendCancellationEmailAsync(message.OrderId, message.UserId, message.Reason);
+                _logger.LogInformation($"[OrderCancelledConsumer] Cancellation email sent for Order: {message.OrderId}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"[OrderCancelledConsumer] Error sending cancellation email for Order: {message.OrderId}");
+                // Don't throw - email failures shouldn't fail the saga
+            }
         }
     }
 

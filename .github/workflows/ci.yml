@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/mechira
+
+jobs:
+  # ─── Job 1: Build solution & run unit tests ───────────────────────────────
+  test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore dependencies
+        run: dotnet restore mecira-microservices.sln
+
+      - name: Build solution
+        run: dotnet build mecira-microservices.sln --no-restore --configuration Release
+
+      - name: Run unit tests
+        run: dotnet test mecira-microservices.sln --no-build --configuration Release --logger "trx;LogFileName=results.trx" --results-directory ./test-results
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ./test-results/*.trx
+
+  # ─── Job 2: Build & push Docker images (only on push, not PRs) ───────────
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push'
+
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        include:
+          - service: auth-service
+            dockerfile: Services/AuthService/Dockerfile
+          - service: catalog-service
+            dockerfile: Services/CatalogService/Dockerfile
+          - service: order-service
+            dockerfile: Services/OrderService/Dockerfile
+          - service: lottery-service
+            dockerfile: Services/LotteryService/Dockerfile
+          - service: notification-service
+            dockerfile: Services/NotificationService/Dockerfile
+          - service: api-gateway
+            dockerfile: Gateway/ApiGateway/Dockerfile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.service }}
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:latest
+
+  # ─── Job 3: Smoke test — spin up all services and verify /health ──────────
+  smoke-test:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    needs: docker
+    if: github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start all services
+        run: docker compose up -d --build
+
+      - name: Wait for services to be healthy (90s)
+        run: |
+          echo "Waiting for services to start..."
+          sleep 90
+
+      - name: Check health endpoints
+        run: |
+          check_health() {
+            local url=$1
+            local name=$2
+            local status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url")
+            if [ "$status" = "200" ]; then
+              echo "✅ $name is healthy ($status)"
+            else
+              echo "❌ $name returned $status"
+              exit 1
+            fi
+          }
+          check_health "http://localhost:5001/api/health" "AuthService"
+          check_health "http://localhost:5002/api/health" "CatalogService (via Nginx)"
+          check_health "http://localhost:5003/api/health" "OrderService"
+          check_health "http://localhost:5004/api/health" "LotteryService"
+          check_health "http://localhost:5005/api/health" "NotificationService"
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

@@ -1,5 +1,8 @@
-using MassTransit;
+﻿using MassTransit;
 using SharedModels.Events;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Threading.Tasks;
 
 namespace NotificationService.Consumers;
 
@@ -20,18 +23,26 @@ public class OrderConfirmedConsumer : IConsumer<OrderConfirmed>
     public async Task Consume(ConsumeContext<OrderConfirmed> context)
     {
         var message = context.Message;
-        _logger.LogInformation($"[OrderConfirmedConsumer] Received OrderConfirmed event for Order: {message.OrderId}, User: {message.UserId}");
 
-        try
+        // 🌟 חילוץ ה-CorrelationId (אם לא קיים, ניקח את ה-OrderId כגיבוי)
+        var correlationId = context.CorrelationId ?? message.OrderId;
+
+        // 🌟 שימוש בנתיב המלא של Serilog כדי למנוע שגיאות קומפילציה
+        using (Serilog.Context.LogContext.PushProperty("CorrelationId", correlationId))
         {
-            // Simulate sending confirmation email
-            await SendConfirmationEmailAsync(message.OrderId, message.UserId);
-            _logger.LogInformation($"[OrderConfirmedConsumer] Confirmation email sent for Order: {message.OrderId}");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, $"[OrderConfirmedConsumer] Error sending confirmation email for Order: {message.OrderId}");
-            // Don't throw - email failures shouldn't fail the saga
+            _logger.LogInformation($"[OrderConfirmedConsumer] Received OrderConfirmed event for Order: {message.OrderId}, User: {message.UserId}");
+
+            try
+            {
+                // Simulate sending confirmation email
+                await SendConfirmationEmailAsync(message.OrderId, message.UserId);
+                _logger.LogInformation($"[OrderConfirmedConsumer] Confirmation email sent for Order: {message.OrderId}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"[OrderConfirmedConsumer] Error sending confirmation email for Order: {message.OrderId}");
+                // Don't throw - email failures shouldn't fail the saga
+            }
         }
     }
 

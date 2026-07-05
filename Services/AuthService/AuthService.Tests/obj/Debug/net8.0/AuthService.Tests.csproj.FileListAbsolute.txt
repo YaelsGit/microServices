@@ -1,6 +1,0 @@
-D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\AuthService.Tests\obj\Debug\net8.0\AuthService.Tests.csproj.AssemblyReference.cache
-D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\AuthService.Tests\obj\Debug\net8.0\AuthService.Tests.GeneratedMSBuildEditorConfig.editorconfig
-D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\AuthService.Tests\obj\Debug\net8.0\AuthService.Tests.AssemblyInfoInputs.cache
-D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\AuthService.Tests\obj\Debug\net8.0\AuthService.Tests.AssemblyInfo.cs
-D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\AuthService.Tests\obj\Debug\net8.0\AuthService.Tests.csproj.CoreCompileInputs.cache
-D:\Documents\שרי\לימודים\microservise\server\Services\AuthService\AuthService.Tests\obj\Debug\net8.0\AuthService.Tests.sourcelink.json

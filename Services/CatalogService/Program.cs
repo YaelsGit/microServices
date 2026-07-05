@@ -9,10 +9,12 @@ using SharedModels.Utilities;
 using MassTransit;
 using StackExchange.Redis;
 using CatalogService.Services.Cache;
+using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // ============ SERILOG CONFIGURATION ============
+var seqUrl = builder.Configuration["Seq:ServerUrl"] ?? "http://seq:5341";
 builder.Host.UseSerilog((context, config) =>
 {
     config
@@ -21,8 +23,9 @@ builder.Host.UseSerilog((context, config) =>
         .WriteTo.File(
             "logs/catalog-service-.txt",
             rollingInterval: RollingInterval.Day,
-            outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level}] {Message:lj}{NewLine}{Exception}"
+            outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level}] [{CorrelationId}] {Message:lj}{NewLine}{Exception}"
         )
+        .WriteTo.Seq(seqUrl)
         .Enrich.FromLogContext();
 });
 
@@ -34,10 +37,18 @@ builder.Services.AddDbContext<CatalogDbContext>(options =>
     )
 );
 
+// ============ MONGODB CONFIGURATION (Polyglot Persistence) ============
+// Gifts use MongoDB (document DB) — flexible schema per gift category
+// Donors & Categories remain in SQL Server (relational, stable schema)
+var mongoConnectionString = builder.Configuration.GetConnectionString("MongoConnection") ?? "mongodb://mongodb:27017";
+var mongoClient = new MongoClient(mongoConnectionString);
+var mongoDatabase = mongoClient.GetDatabase("Mechira-CatalogService");
+builder.Services.AddSingleton<IMongoDatabase>(mongoDatabase);
+
 // ============ DEPENDENCY INJECTION ============
 // Repositories
 builder.Services.AddScoped<IDonorsRepository, DonorsRepository>();
-builder.Services.AddScoped<IGiftsRepository, GiftsRepository>();
+builder.Services.AddScoped<IGiftsRepository, MongoGiftsRepository>();  // MongoDB
 builder.Services.AddScoped<ICategoriesRepository, CategoriesRepository>();
 
 // Services
@@ -59,10 +70,10 @@ builder.Services.AddMassTransit(x =>
     x.AddConsumers(typeof(Program).Assembly);
     x.UsingRabbitMq((context, cfg) =>
     {
-        cfg.Host("rabbitmq", h =>
+        cfg.Host(builder.Configuration["RabbitMQ:Host"] ?? "rabbitmq", h =>
         {
-            h.Username("guest");
-            h.Password("guest");
+            h.Username(builder.Configuration["RabbitMQ:Username"] ?? "guest");
+            h.Password(builder.Configuration["RabbitMQ:Password"] ?? "guest");
         });
         cfg.ConfigureEndpoints(context);
     });
@@ -162,9 +173,6 @@ app.UseMiddleware<GlobalExceptionMiddleware>();
 // Logging
 app.UseSerilogRequestLogging();
 
-// HTTPS redirection
-app.UseHttpsRedirection();
-
 // CORS
 app.UseCors("AllowAll");
 
@@ -182,25 +190,6 @@ if (app.Environment.IsDevelopment())
         options.RoutePrefix = "swagger";
     });
 }
-
-// ============ MIDDLEWARE PIPELINE ============
-// Note: Duplicate middleware configuration was removed
-// Final middleware pipeline
-
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI(options =>
-    {
-        options.SwaggerEndpoint("/swagger/v1/swagger.json", "CatalogService API v1");
-        options.RoutePrefix = "swagger";
-    });
-}
-
-app.UseHttpsRedirection();
-app.UseCors("AllowAll");
-app.UseAuthentication();
-app.UseAuthorization();
 
 app.MapControllers();
 

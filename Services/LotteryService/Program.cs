@@ -1,4 +1,4 @@
-using Serilog;
+﻿using Serilog;
 using Microsoft.EntityFrameworkCore;
 using LotteryService.Data;
 using LotteryService.Repository;
@@ -12,10 +12,12 @@ using Microsoft.OpenApi.Models;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Http.Resilience;
 using Polly;
+using MassTransit;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // ============ SERILOG CONFIGURATION ============
+var seqUrl = builder.Configuration["Seq:ServerUrl"] ?? "http://seq:5341";
 builder.Host.UseSerilog((context, config) =>
 {
     config
@@ -24,8 +26,9 @@ builder.Host.UseSerilog((context, config) =>
         .WriteTo.File(
             "logs/lottery-service-.txt",
             rollingInterval: RollingInterval.Day,
-            outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level}] {Message:lj}{NewLine}{Exception}"
+            outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level}] [{CorrelationId}] {Message:lj}{NewLine}{Exception}"
         )
+        .WriteTo.Seq(seqUrl)
         .Enrich.FromLogContext();
 });
 
@@ -242,7 +245,21 @@ if (app.Environment.IsDevelopment())
         options.RoutePrefix = "swagger";
     });
 }
+builder.Services.AddMassTransit(x =>
+{
+    x.AddConsumers(typeof(Program).Assembly);
 
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        cfg.Host("rabbitmq", h =>
+        {
+            h.Username("guest");
+            h.Password("guest");
+        });
+
+        cfg.ConfigureEndpoints(context);
+    });
+});
 // Map controllers
 app.MapControllers();
 

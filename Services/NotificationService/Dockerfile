@@ -7,8 +7,7 @@ COPY ["Shared/SharedModels/SharedModels.csproj", "Shared/SharedModels/"]
 COPY ["Services/NotificationService/NotificationService.csproj", "Services/NotificationService/"]
 
 # Restore dependencies
-RUN dotnet restore "mecira-microservices.sln"
-
+RUN dotnet restore "Services/NotificationService/NotificationService.csproj"
 # Copy source code
 COPY . .
 

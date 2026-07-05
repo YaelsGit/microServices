@@ -1,8 +1,11 @@
-using MassTransit;
+﻿using MassTransit;
 using SharedModels.Events;
 using OrderService.Interfaces;
 using OrderService.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Threading.Tasks;
 
 namespace OrderService.Consumers;
 
@@ -27,42 +30,50 @@ public class InventoryReservedConsumer : IConsumer<InventoryReserved>
     public async Task Consume(ConsumeContext<InventoryReserved> context)
     {
         var message = context.Message;
-        _logger.LogInformation($"[InventoryReservedConsumer] Received InventoryReserved event for Order: {message.OrderId}");
 
-        try
+        // 🌟 חילוץ ה-CorrelationId מתוך הקונטקסט של MassTransit (או שימוש ב-OrderId כגיבוי)
+        var correlationId = context.CorrelationId ?? message.OrderId;
+
+        // 🌟 עטיפת הלוגיקה באמצעות ה-LogContext המפורש של Serilog
+        using (Serilog.Context.LogContext.PushProperty("CorrelationId", correlationId))
         {
-            // Find the order by OrderId
-            // Note: OrderId in events is Guid, but in DB might be int - this is a bridge point
-            var order = await _dbContext.Orders.FirstOrDefaultAsync(o => o.OrderId.ToString() == message.OrderId.ToString());
+            _logger.LogInformation($"[InventoryReservedConsumer] Received InventoryReserved event for Order: {message.OrderId}");
 
-            if (order == null)
+            try
             {
-                _logger.LogError($"[InventoryReservedConsumer] Order not found: {message.OrderId}");
-                return;
+                // Find the order by OrderId
+                // Note: OrderId in events is Guid, but in DB might be int - this is a bridge point
+                var order = await _dbContext.Orders.FirstOrDefaultAsync(o => o.OrderId.ToString() == message.OrderId.ToString());
+
+                if (order == null)
+                {
+                    _logger.LogError($"[InventoryReservedConsumer] Order not found: {message.OrderId}");
+                    return;
+                }
+
+                // Update order status to "Confirmed"
+                order.Status = "Confirmed";
+                order.UpdatedAt = DateTime.UtcNow;
+
+                await _dbContext.SaveChangesAsync();
+                _logger.LogInformation($"[InventoryReservedConsumer] Order {message.OrderId} status updated to Confirmed");
+
+                // Publish OrderConfirmed event
+                var confirmedEvent = new OrderConfirmed
+                {
+                    OrderId = message.OrderId,
+                    UserId = order.UserId.ToString() == "" ? Guid.NewGuid() : Guid.Parse(order.UserId.ToString()),
+                    ConfirmedAt = DateTime.UtcNow
+                };
+
+                await _publishEndpoint.Publish(confirmedEvent);
+                _logger.LogInformation($"[InventoryReservedConsumer] OrderConfirmed event published for Order: {message.OrderId}");
             }
-
-            // Update order status to "Confirmed"
-            order.Status = "Confirmed";
-            order.UpdatedAt = DateTime.UtcNow;
-
-            await _dbContext.SaveChangesAsync();
-            _logger.LogInformation($"[InventoryReservedConsumer] Order {message.OrderId} status updated to Confirmed");
-
-            // Publish OrderConfirmed event
-            var confirmedEvent = new OrderConfirmed
+            catch (Exception ex)
             {
-                OrderId = message.OrderId,
-                UserId = order.UserId.ToString() == "" ? Guid.NewGuid() : Guid.Parse(order.UserId.ToString()),
-                ConfirmedAt = DateTime.UtcNow
-            };
-
-            await _publishEndpoint.Publish(confirmedEvent);
-            _logger.LogInformation($"[InventoryReservedConsumer] OrderConfirmed event published for Order: {message.OrderId}");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, $"[InventoryReservedConsumer] Error processing InventoryReserved event for Order: {message.OrderId}");
-            throw;
+                _logger.LogError(ex, $"[InventoryReservedConsumer] Error processing InventoryReserved event for Order: {message.OrderId}");
+                throw;
+            }
         }
     }
 }

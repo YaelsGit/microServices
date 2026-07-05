@@ -1,9 +1,0 @@
-D:\Documents\שרי\לימודים\microservise\server\Services\LotteryService\obj\Release\net8.0\LotteryService.csproj.AssemblyReference.cache
-D:\Documents\שרי\לימודים\microservise\server\Services\LotteryService\obj\Release\net8.0\rpswa.dswa.cache.json
-D:\Documents\שרי\לימודים\microservise\server\Services\LotteryService\obj\Release\net8.0\LotteryService.GeneratedMSBuildEditorConfig.editorconfig
-D:\Documents\שרי\לימודים\microservise\server\Services\LotteryService\obj\Release\net8.0\LotteryService.AssemblyInfoInputs.cache
-D:\Documents\שרי\לימודים\microservise\server\Services\LotteryService\obj\Release\net8.0\LotteryService.AssemblyInfo.cs
-D:\Documents\שרי\לימודים\microservise\server\Services\LotteryService\obj\Release\net8.0\LotteryService.csproj.CoreCompileInputs.cache
-D:\Documents\שרי\לימודים\microservise\server\Services\LotteryService\obj\Release\net8.0\LotteryService.MvcApplicationPartsAssemblyInfo.cs
-D:\Documents\שרי\לימודים\microservise\server\Services\LotteryService\obj\Release\net8.0\LotteryService.MvcApplicationPartsAssemblyInfo.cache
-D:\Documents\שרי\לימודים\microservise\server\Services\LotteryService\obj\Release\net8.0\LotteryService.sourcelink.json

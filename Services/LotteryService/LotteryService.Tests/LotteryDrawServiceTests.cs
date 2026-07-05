@@ -1,492 +1,207 @@
 using Xunit;
 using Moq;
 using LotteryService.Services;
-using LotteryService.Repository;
+using LotteryService.Interfaces;
+using LotteryService.HttpClients;
 using SharedModels.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using SharedModels.Dtos;
 
 namespace LotteryService.Tests;
 
-/// <summary>
-/// Unit tests for LotteryDrawService - Critical Business Logic
-/// Tests lottery draw algorithm and fairness guarantees
-/// </summary>
 public class LotteryDrawServiceTests
 {
     private readonly Mock<ILotteryRepository> _repositoryMock;
-    private readonly LotteryDrawService _lotteryService;
+    private readonly Mock<AuthServiceClient> _authClientMock;
+    private readonly Mock<CatalogServiceClient> _catalogClientMock;
+    private readonly Mock<ILogger<LotteryDrawService>> _loggerMock;
+    private readonly LotteryDrawService _service;
 
     public LotteryDrawServiceTests()
     {
         _repositoryMock = new Mock<ILotteryRepository>();
-        _lotteryService = new LotteryDrawService(_repositoryMock.Object);
+        _authClientMock = new Mock<AuthServiceClient>();
+        _catalogClientMock = new Mock<CatalogServiceClient>();
+        _loggerMock = new Mock<ILogger<LotteryDrawService>>();
+
+        _service = new LotteryDrawService(
+            _repositoryMock.Object,
+            _authClientMock.Object,
+            _catalogClientMock.Object,
+            _loggerMock.Object);
     }
 
-    #region Draw Creation Tests
+    // ── CreateLotteryTicketAsync ──────────────────────────────────────────
 
     [Fact]
-    public async Task CreateDraw_WithValidData_ShouldCreateDraw()
+    public async Task CreateLotteryTicketAsync_ValidUserAndGift_ReturnsSuccess()
     {
-        // Arrange
-        var draw = new LotteryDraw
-        {
-            Name = "Weekly Draw",
-            DrawDate = DateTime.UtcNow.AddDays(7),
-            Prize = 1000m,
-            Status = "scheduled"
-        };
+        _authClientMock.Setup(c => c.UserExistsAsync(1)).ReturnsAsync(true);
+        _catalogClientMock.Setup(c => c.GetGiftAsync(1))
+            .ReturnsAsync((true, 100m, 5, "Gift A"));
+        _repositoryMock.Setup(r => r.CreateLotteryAsync(It.IsAny<Lottery>())).ReturnsAsync(10);
 
-        _repositoryMock
-            .Setup(r => r.CreateDrawAsync(It.IsAny<LotteryDraw>()))
+        var (success, ticketId, _) = await _service.CreateLotteryTicketAsync(1, 1);
+
+        Assert.True(success);
+        Assert.Equal(10, ticketId);
+    }
+
+    [Fact]
+    public async Task CreateLotteryTicketAsync_UserNotFound_ReturnsFail()
+    {
+        _authClientMock.Setup(c => c.UserExistsAsync(99)).ReturnsAsync(false);
+
+        var (success, _, message) = await _service.CreateLotteryTicketAsync(99, 1);
+
+        Assert.False(success);
+        Assert.NotEmpty(message);
+    }
+
+    [Fact]
+    public async Task CreateLotteryTicketAsync_GiftNotFound_ReturnsFail()
+    {
+        _authClientMock.Setup(c => c.UserExistsAsync(1)).ReturnsAsync(true);
+        _catalogClientMock.Setup(c => c.GetGiftAsync(99))
+            .ReturnsAsync((false, 0m, 0, string.Empty));
+
+        var (success, _, message) = await _service.CreateLotteryTicketAsync(1, 99);
+
+        Assert.False(success);
+        Assert.NotEmpty(message);
+    }
+
+    [Fact]
+    public async Task CreateLotteryTicketAsync_SetsStatusToActive()
+    {
+        Lottery? captured = null;
+        _authClientMock.Setup(c => c.UserExistsAsync(1)).ReturnsAsync(true);
+        _catalogClientMock.Setup(c => c.GetGiftAsync(1))
+            .ReturnsAsync((true, 50m, 3, "Gift"));
+        _repositoryMock.Setup(r => r.CreateLotteryAsync(It.IsAny<Lottery>()))
+            .Callback<Lottery>(l => captured = l)
             .ReturnsAsync(1);
 
-        // Act
-        var result = await _lotteryService.CreateDrawAsync(draw);
+        await _service.CreateLotteryTicketAsync(1, 1);
 
-        // Assert
-        Assert.Equal(1, result);
-        _repositoryMock.Verify(r => r.CreateDrawAsync(It.IsAny<LotteryDraw>()), Times.Once);
+        Assert.NotNull(captured);
+        Assert.Equal("active", captured!.Status);
+    }
+
+    // ── RunLotteryAsync ───────────────────────────────────────────────────
+
+    [Fact]
+    public async Task RunLotteryAsync_NoActiveTickets_ReturnsFail()
+    {
+        _repositoryMock.Setup(r => r.GetLotteryByStatusAsync("active"))
+            .ReturnsAsync(new List<Lottery>());
+
+        var (success, _, _) = await _service.RunLotteryAsync();
+
+        Assert.False(success);
     }
 
     [Fact]
-    public async Task CreateDraw_ShouldSetStatusToScheduled()
+    public async Task RunLotteryAsync_WithActiveTickets_ReturnsSuccess()
     {
-        // Arrange
-        var draw = new LotteryDraw
-        {
-            Name = "Monthly Draw",
-            DrawDate = DateTime.UtcNow.AddDays(30),
-            Prize = 5000m
-        };
-
-        LotteryDraw capturedDraw = null;
-        _repositoryMock
-            .Setup(r => r.CreateDrawAsync(It.IsAny<LotteryDraw>()))
-            .Callback<LotteryDraw>(d => capturedDraw = d)
-            .ReturnsAsync(1);
-
-        // Act
-        await _lotteryService.CreateDrawAsync(draw);
-
-        // Assert
-        Assert.NotNull(capturedDraw);
-        Assert.Equal("scheduled", capturedDraw.Status);
-    }
-
-    [Fact]
-    public async Task CreateDraw_WithPastDate_ShouldThrowException()
-    {
-        // Arrange
-        var draw = new LotteryDraw
-        {
-            Name = "Invalid Draw",
-            DrawDate = DateTime.UtcNow.AddDays(-1),  // Past date
-            Prize = 1000m
-        };
-
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(
-            () => _lotteryService.CreateDrawAsync(draw)
-        );
-    }
-
-    [Fact]
-    public async Task CreateDraw_WithNegativePrize_ShouldThrowException()
-    {
-        // Arrange
-        var draw = new LotteryDraw
-        {
-            Name = "Invalid Draw",
-            DrawDate = DateTime.UtcNow.AddDays(7),
-            Prize = -100m  // Invalid
-        };
-
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(
-            () => _lotteryService.CreateDrawAsync(draw)
-        );
-    }
-
-    [Fact]
-    public async Task CreateDraw_WithZeroPrize_ShouldThrowException()
-    {
-        // Arrange
-        var draw = new LotteryDraw
-        {
-            Name = "Invalid Draw",
-            DrawDate = DateTime.UtcNow.AddDays(7),
-            Prize = 0m
-        };
-
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(
-            () => _lotteryService.CreateDrawAsync(draw)
-        );
-    }
-
-    #endregion
-
-    #region Lottery Entry Tests
-
-    [Fact]
-    public async Task EnterLottery_WithValidUserAndDraw_ShouldCreateTicket()
-    {
-        // Arrange
-        int userId = 1;
-        int drawId = 1;
-
-        var draw = new LotteryDraw
-        {
-            DrawId = drawId,
-            Name = "Test Draw",
-            Status = "scheduled"
-        };
-
-        _repositoryMock
-            .Setup(r => r.GetDrawByIdAsync(drawId))
-            .ReturnsAsync(draw);
-
-        _repositoryMock
-            .Setup(r => r.CreateTicketAsync(It.IsAny<LotteryTicket>()))
-            .ReturnsAsync(1);
-
-        // Act
-        var result = await _lotteryService.EnterLotteryAsync(userId, drawId);
-
-        // Assert
-        Assert.Equal(1, result);
-        _repositoryMock.Verify(r => r.CreateTicketAsync(It.IsAny<LotteryTicket>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task EnterLottery_WithCompletedDraw_ShouldThrowException()
-    {
-        // Arrange
-        int drawId = 1;
-        var draw = new LotteryDraw
-        {
-            DrawId = drawId,
-            Status = "completed"  // Cannot enter completed draw
-        };
-
-        _repositoryMock
-            .Setup(r => r.GetDrawByIdAsync(drawId))
-            .ReturnsAsync(draw);
-
-        // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _lotteryService.EnterLotteryAsync(1, drawId)
-        );
-    }
-
-    [Fact]
-    public async Task EnterLottery_WithNonExistentDraw_ShouldThrowException()
-    {
-        // Arrange
-        _repositoryMock
-            .Setup(r => r.GetDrawByIdAsync(999))
-            .ReturnsAsync((LotteryDraw)null);
-
-        // Act & Assert
-        await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => _lotteryService.EnterLotteryAsync(1, 999)
-        );
-    }
-
-    [Fact]
-    public async Task EnterLottery_SameUserTwice_ShouldCreateTwoTickets()
-    {
-        // Arrange
-        int userId = 1;
-        int drawId = 1;
-
-        var draw = new LotteryDraw
-        {
-            DrawId = drawId,
-            Status = "scheduled"
-        };
-
-        _repositoryMock
-            .Setup(r => r.GetDrawByIdAsync(drawId))
-            .ReturnsAsync(draw);
-
-        _repositoryMock
-            .Setup(r => r.CreateTicketAsync(It.IsAny<LotteryTicket>()))
-            .ReturnsAsync(1);  // Returns different IDs for each call
-
-        // Act
-        var ticket1 = await _lotteryService.EnterLotteryAsync(userId, drawId);
-        var ticket2 = await _lotteryService.EnterLotteryAsync(userId, drawId);
-
-        // Assert
-        _repositoryMock.Verify(r => r.CreateTicketAsync(It.IsAny<LotteryTicket>()), Times.Exactly(2));
-    }
-
-    #endregion
-
-    #region Lottery Draw Algorithm Tests
-
-    [Fact]
-    public async Task ConductDraw_WithNoTickets_ShouldThrowException()
-    {
-        // Arrange
-        int drawId = 1;
-        var draw = new LotteryDraw { DrawId = drawId, Status = "scheduled" };
-
-        _repositoryMock
-            .Setup(r => r.GetDrawByIdAsync(drawId))
-            .ReturnsAsync(draw);
-
-        _repositoryMock
-            .Setup(r => r.GetTicketsForDrawAsync(drawId))
-            .ReturnsAsync(new List<LotteryTicket>());  // No tickets
-
-        // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _lotteryService.ConductDrawAsync(drawId)
-        );
-    }
-
-    [Fact]
-    public async Task ConductDraw_ShouldSelectOneWinner()
-    {
-        // Arrange
-        int drawId = 1;
-        var draw = new LotteryDraw { DrawId = drawId, Status = "scheduled" };
-        var tickets = new List<LotteryTicket>
-        {
-            new LotteryTicket { TicketId = 1, UserId = 100, DrawId = drawId },
-            new LotteryTicket { TicketId = 2, UserId = 101, DrawId = drawId },
-            new LotteryTicket { TicketId = 3, UserId = 102, DrawId = drawId }
-        };
-
-        _repositoryMock
-            .Setup(r => r.GetDrawByIdAsync(drawId))
-            .ReturnsAsync(draw);
-
-        _repositoryMock
-            .Setup(r => r.GetTicketsForDrawAsync(drawId))
-            .ReturnsAsync(tickets);
-
-        _repositoryMock
-            .Setup(r => r.MarkWinnerAsync(It.IsAny<int>(), It.IsAny<int>()))
+        _repositoryMock.Setup(r => r.GetLotteryByStatusAsync("active"))
+            .ReturnsAsync(new List<Lottery>
+            {
+                new Lottery { LotteryId = 1, UserId = 1, GiftId = 1, Status = "active" },
+                new Lottery { LotteryId = 2, UserId = 2, GiftId = 1, Status = "active" }
+            });
+        _repositoryMock.Setup(r => r.UpdateLotteryStatusAsync(It.IsAny<int>(), It.IsAny<string>()))
             .ReturnsAsync(true);
+        _repositoryMock.Setup(r => r.MarkAsWonAsync(It.IsAny<int>())).ReturnsAsync(true);
 
-        _repositoryMock
-            .Setup(r => r.UpdateDrawAsync(It.IsAny<LotteryDraw>()))
+        var (success, winnerCount, _) = await _service.RunLotteryAsync();
+
+        Assert.True(success);
+        Assert.Equal(1, winnerCount); // one winner per gift
+    }
+
+    [Fact]
+    public async Task RunLotteryAsync_SelectsExactlyOneWinnerPerGift()
+    {
+        _repositoryMock.Setup(r => r.GetLotteryByStatusAsync("active"))
+            .ReturnsAsync(new List<Lottery>
+            {
+                new Lottery { LotteryId = 1, UserId = 1, GiftId = 1, Status = "active" },
+                new Lottery { LotteryId = 2, UserId = 2, GiftId = 1, Status = "active" },
+                new Lottery { LotteryId = 3, UserId = 3, GiftId = 2, Status = "active" }
+            });
+        _repositoryMock.Setup(r => r.UpdateLotteryStatusAsync(It.IsAny<int>(), It.IsAny<string>()))
             .ReturnsAsync(true);
+        _repositoryMock.Setup(r => r.MarkAsWonAsync(It.IsAny<int>())).ReturnsAsync(true);
 
-        // Act
-        await _lotteryService.ConductDrawAsync(drawId);
+        var (success, winnerCount, _) = await _service.RunLotteryAsync();
 
-        // Assert - Exactly one winner should be marked
-        _repositoryMock.Verify(
-            r => r.MarkWinnerAsync(It.IsAny<int>(), It.IsAny<int>()),
-            Times.Once
-        );
+        Assert.True(success);
+        Assert.Equal(2, winnerCount); // one winner per gift (gift 1 and gift 2)
+    }
+
+    // ── GetWinnersAsync ───────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetWinnersAsync_ReturnsEnrichedWinners()
+    {
+        _repositoryMock.Setup(r => r.GetWinnersAsync())
+            .ReturnsAsync(new List<Lottery>
+            {
+                new Lottery { LotteryId = 1, UserId = 1, GiftId = 1, WonAt = DateTime.UtcNow }
+            });
+        _authClientMock.Setup(c => c.GetUserAsync(1))
+            .ReturnsAsync((true, "winner@example.com", "John", "Doe"));
+        _catalogClientMock.Setup(c => c.GetGiftAsync(1))
+            .ReturnsAsync((true, 100m, 1, "Prize Gift"));
+
+        var result = (await _service.GetWinnersAsync()).ToList();
+
+        Assert.Single(result);
+        Assert.Equal("winner@example.com", result[0].UserEmail);
+        Assert.Equal("Prize Gift", result[0].GiftName);
+    }
+
+    // ── GetUserLotteryTicketsAsync ─────────────────────────────────────────
+
+    [Fact]
+    public async Task GetUserLotteryTicketsAsync_ReturnsUserTickets()
+    {
+        _repositoryMock.Setup(r => r.GetLotteryByUserIdAsync(1))
+            .ReturnsAsync(new List<Lottery>
+            {
+                new Lottery { LotteryId = 1, UserId = 1, GiftId = 1, Status = "active" },
+                new Lottery { LotteryId = 2, UserId = 1, GiftId = 2, Status = "won" }
+            });
+
+        var result = (await _service.GetUserLotteryTicketsAsync(1)).ToList();
+
+        Assert.Equal(2, result.Count);
     }
 
     [Fact]
-    public async Task ConductDraw_WinnerShouldBeOneOfTheParticipants()
+    public async Task GetUserLotteryTicketsAsync_NoTickets_ReturnsEmpty()
     {
-        // Arrange
-        int drawId = 1;
-        var draw = new LotteryDraw { DrawId = drawId, Status = "scheduled" };
-        var tickets = new List<LotteryTicket>
-        {
-            new LotteryTicket { TicketId = 1, UserId = 100, DrawId = drawId },
-            new LotteryTicket { TicketId = 2, UserId = 101, DrawId = drawId }
-        };
+        _repositoryMock.Setup(r => r.GetLotteryByUserIdAsync(99))
+            .ReturnsAsync(new List<Lottery>());
 
-        var validUserIds = new HashSet<int> { 100, 101 };
+        var result = await _service.GetUserLotteryTicketsAsync(99);
 
-        _repositoryMock
-            .Setup(r => r.GetDrawByIdAsync(drawId))
-            .ReturnsAsync(draw);
-
-        _repositoryMock
-            .Setup(r => r.GetTicketsForDrawAsync(drawId))
-            .ReturnsAsync(tickets);
-
-        _repositoryMock
-            .Setup(r => r.MarkWinnerAsync(It.IsAny<int>(), It.IsAny<int>()))
-            .ReturnsAsync(true);
-
-        _repositoryMock
-            .Setup(r => r.UpdateDrawAsync(It.IsAny<LotteryDraw>()))
-            .ReturnsAsync(true);
-
-        // Act
-        await _lotteryService.ConductDrawAsync(drawId);
-
-        // Assert
-        _repositoryMock.Verify(
-            r => r.MarkWinnerAsync(
-                It.Is<int>(winnerUserId => validUserIds.Contains(winnerUserId)),
-                drawId
-            ),
-            Times.Once
-        );
+        Assert.Empty(result);
     }
+
+    // ── GetLotteryStatisticsAsync ─────────────────────────────────────────
 
     [Fact]
-    public async Task ConductDraw_ShouldUpdateDrawStatusToCompleted()
+    public async Task GetLotteryStatisticsAsync_ReturnsCorrectCounts()
     {
-        // Arrange
-        int drawId = 1;
-        var draw = new LotteryDraw { DrawId = drawId, Status = "scheduled" };
-        var tickets = new List<LotteryTicket>
-        {
-            new LotteryTicket { TicketId = 1, UserId = 100, DrawId = drawId }
-        };
+        _repositoryMock.Setup(r => r.GetTotalTicketsAsync()).ReturnsAsync(10);
+        _repositoryMock.Setup(r => r.GetWinningTicketsCountAsync()).ReturnsAsync(3);
+        _repositoryMock.Setup(r => r.GetWinnersAsync()).ReturnsAsync(new List<Lottery>());
 
-        LotteryDraw updatedDraw = null;
-        _repositoryMock
-            .Setup(r => r.GetDrawByIdAsync(drawId))
-            .ReturnsAsync(draw);
+        var stats = await _service.GetLotteryStatisticsAsync();
 
-        _repositoryMock
-            .Setup(r => r.GetTicketsForDrawAsync(drawId))
-            .ReturnsAsync(tickets);
-
-        _repositoryMock
-            .Setup(r => r.MarkWinnerAsync(It.IsAny<int>(), It.IsAny<int>()))
-            .ReturnsAsync(true);
-
-        _repositoryMock
-            .Setup(r => r.UpdateDrawAsync(It.IsAny<LotteryDraw>()))
-            .Callback<LotteryDraw>(d => updatedDraw = d)
-            .ReturnsAsync(true);
-
-        // Act
-        await _lotteryService.ConductDrawAsync(drawId);
-
-        // Assert
-        Assert.NotNull(updatedDraw);
-        Assert.Equal("completed", updatedDraw.Status);
+        Assert.Equal(10, stats.TotalTickets);
+        Assert.Equal(3, stats.WinningTickets);
+        Assert.Equal(7, stats.LosingTickets);
     }
-
-    [Fact]
-    public async Task ConductDraw_WithCompletedDraw_ShouldThrowException()
-    {
-        // Arrange
-        var draw = new LotteryDraw { DrawId = 1, Status = "completed" };
-
-        _repositoryMock
-            .Setup(r => r.GetDrawByIdAsync(1))
-            .ReturnsAsync(draw);
-
-        // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _lotteryService.ConductDrawAsync(1)
-        );
-    }
-
-    #endregion
-
-    #region Draw Fairness Tests
-
-    [Fact]
-    public async Task ConductDraw_MultipleRuns_ShouldDistributeWinnersUniformly()
-    {
-        // Arrange - Run multiple draws to check fairness
-        var winnerCounts = new Dictionary<int, int>();
-        int numberOfRuns = 100;
-        int ticketsPerDraw = 10;
-
-        for (int run = 0; run < numberOfRuns; run++)
-        {
-            int drawId = run + 1;
-            var draw = new LotteryDraw { DrawId = drawId, Status = "scheduled" };
-            var tickets = Enumerable.Range(1, ticketsPerDraw)
-                .Select(i => new LotteryTicket { TicketId = i, UserId = i, DrawId = drawId })
-                .ToList();
-
-            _repositoryMock
-                .Setup(r => r.GetDrawByIdAsync(drawId))
-                .ReturnsAsync(draw);
-
-            _repositoryMock
-                .Setup(r => r.GetTicketsForDrawAsync(drawId))
-                .ReturnsAsync(tickets);
-
-            int winnerUserId = 0;
-            _repositoryMock
-                .Setup(r => r.MarkWinnerAsync(It.IsAny<int>(), drawId))
-                .Callback<int, int>((uid, _) => winnerUserId = uid)
-                .ReturnsAsync(true);
-
-            _repositoryMock
-                .Setup(r => r.UpdateDrawAsync(It.IsAny<LotteryDraw>()))
-                .ReturnsAsync(true);
-
-            // Act
-            await _lotteryService.ConductDrawAsync(drawId);
-
-            // Track winner
-            if (!winnerCounts.ContainsKey(winnerUserId))
-                winnerCounts[winnerUserId] = 0;
-            winnerCounts[winnerUserId]++;
-        }
-
-        // Assert - Each user should win approximately equal times (fairness check)
-        // With 100 runs and 10 users, each should win ~10 times
-        // Allow 50% variance (5-15 wins each)
-        var averageWins = numberOfRuns / (double)ticketsPerDraw;
-        var tolerance = averageWins * 0.5;  // 50% variance tolerance
-
-        foreach (var count in winnerCounts.Values)
-        {
-            Assert.InRange(count, averageWins - tolerance, averageWins + tolerance);
-        }
-    }
-
-    #endregion
-
-    #region Draw Query Tests
-
-    [Fact]
-    public async Task GetActiveDraws_ShouldReturnOnlyScheduledDraws()
-    {
-        // Arrange
-        var draws = new List<LotteryDraw>
-        {
-            new LotteryDraw { DrawId = 1, Status = "scheduled" },
-            new LotteryDraw { DrawId = 2, Status = "scheduled" },
-            new LotteryDraw { DrawId = 3, Status = "completed" }
-        };
-
-        _repositoryMock
-            .Setup(r => r.GetDrawsByStatusAsync("scheduled"))
-            .ReturnsAsync(draws.Where(d => d.Status == "scheduled").ToList());
-
-        // Act
-        var result = await _lotteryService.GetActiveDrawsAsync();
-
-        // Assert
-        Assert.All(result, d => Assert.Equal("scheduled", d.Status));
-    }
-
-    [Fact]
-    public async Task GetDraw_WithValidId_ShouldReturnDraw()
-    {
-        // Arrange
-        var draw = new LotteryDraw { DrawId = 1, Name = "Test Draw" };
-
-        _repositoryMock
-            .Setup(r => r.GetDrawByIdAsync(1))
-            .ReturnsAsync(draw);
-
-        // Act
-        var result = await _lotteryService.GetDrawAsync(1);
-
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal("Test Draw", result.Name);
-    }
-
-    #endregion
 }

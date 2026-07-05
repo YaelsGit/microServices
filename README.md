@@ -1,15 +1,18 @@
 # Mechira Microservices Platform
 
+[![CI](https://github.com/AidyGit/Final-Project-Arc-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/AidyGit/Final-Project-Arc-AI/actions/workflows/ci.yml)
+
 A production-grade microservices system evolved from a monolithic e-commerce/auction API into a distributed, scalable platform demonstrating enterprise patterns: service isolation, asynchronous messaging, API gateway routing, caching, resilience patterns, and structured observability.
 
 ## 🎯 Project Goal
 
 Transform a monolithic API into a microservices architecture with:
 - ✅ **Phase 1:** Database-per-service isolation (COMPLETE)
-- ⏳ **Phase 2:** Correlation ID propagation for distributed tracing
-- ⏳ **Phase 3:** API Gateway, BFF, load balancing
+- ✅ **Phase 2:** Correlation ID propagation for distributed tracing (COMPLETE)
+- ✅ **Phase 3:** API Gateway, BFF, load balancing (COMPLETE)
 - ✅ **Phase 4:** Async messaging, saga pattern, compensation (COMPLETE)
-- ⏳ **Phase 5:** Centralized logging, observability
+- ✅ **Phase 5:** Centralized logging, observability (COMPLETE)
+- ✅ **Bonus:** CI/CD pipeline with GitHub Actions (COMPLETE)
 
 ## 🏗 Architecture Overview
 
@@ -211,12 +214,13 @@ curl http://localhost:5001/api/health
 # }
 ```
 
-### Correlation IDs (Phase 2 ⏳)
-Request flow can be traced via correlation ID headers:
-- Generated per request (currently in AuthService only)
-- Propagated through RabbitMQ message headers
-- Included in all log entries
-- Future: Centralized log aggregation (Loki, Phase 3)
+### Correlation IDs (Phase 2 ✅)
+Request flow can be traced via `X-Correlation-ID` header across all services:
+- Generated at the Gateway on every request (or forwarded if client provides one)
+- Propagated via HTTP headers to all downstream services (AuthService, CatalogService, OrderService)
+- Propagated through RabbitMQ message headers (MassTransit CorrelationId)
+- Included in every Serilog log entry via `LogContext.PushProperty`
+- Aggregated in **Seq** at http://localhost:8081 — search by `CorrelationId` to trace a full saga
 
 ## 🧪 Testing
 
@@ -344,17 +348,22 @@ docker compose logs redis-cache
 docker compose exec redis-cache redis-cli ping
 ```
 
-## 📈 Planned Phases
+## 🤖 CI/CD Pipeline
 
-- **Phase 2 (Next):** Correlation ID propagation for distributed tracing
-- **Phase 3:** API Gateway enhancements, BFF layer, load balancing
-- **Phase 4:** Log aggregation with Loki + Grafana dashboards
-- **Phase 5:** CI/CD pipeline, automated testing
+GitHub Actions pipeline at `.github/workflows/ci.yml`:
+
+| Job | Trigger | What it does |
+|-----|---------|-------------|
+| **Build & Test** | Every push & PR | `dotnet build` + `dotnet test` — failing test blocks the pipeline |
+| **Docker Build** | Push only (after tests pass) | Builds & pushes 6 Docker images to GHCR tagged with commit SHA |
 
 ## 🔗 Related Documentation
 
+- [Architecture Document](./md/ARCHITECTURE_DOCUMENT.md) — Final diagram, ADRs, technology decisions
+- [Phase 1: Monolith Baseline](./md/PHASE1_MONOLITH_BASELINE.md) — Before/after diagram, endpoints, 3 scale problems
 - [Phase 1: Database Isolation](./md/PHASE1_DATABASE_ISOLATION.md) — Service data autonomy
 - [Phase 4: Messaging & Saga](./md/PHASE4_MESSAGING_SAGA.md) — Event-driven order processing
+- [Demo Evidence](./md/DEMO_EVIDENCE.md) — Saga happy/compensation path, cache hit/miss, correlation ID trace
 - [API Documentation](./Gateway/ApiGateway/README.md) — Gateway configuration
 
 ## 📝 License

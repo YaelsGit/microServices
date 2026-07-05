@@ -16,6 +16,7 @@ if (!Directory.Exists(logDirectory))
 builder.Configuration.AddJsonFile("ocelot.json", optional: false, reloadOnChange: true);
 
 // Add Serilog for logging
+var seqUrl = builder.Configuration["Seq:ServerUrl"] ?? "http://seq:5341";
 builder.Host.UseSerilog((context, config) =>
 {
     config
@@ -24,11 +25,17 @@ builder.Host.UseSerilog((context, config) =>
         .WriteTo.File(
             Path.Combine(logDirectory, "api-gateway-.txt"),
             rollingInterval: RollingInterval.Day,
-            outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] {Message:lj}{NewLine}{Exception}");
+            outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] [{CorrelationId}] {Message:lj}{NewLine}{Exception}")
+        .WriteTo.Seq(seqUrl)
+        .Enrich.FromLogContext();
 });
 
 // Add Ocelot
 builder.Services.AddOcelot(builder.Configuration);
+
+// Add Controllers + HttpClient for BFF
+builder.Services.AddControllers();
+builder.Services.AddHttpClient();
 
 // Add Authentication with JWT Bearer
 builder.Services.AddAuthentication("Bearer")
@@ -69,11 +76,33 @@ var app = builder.Build();
 app.UseSerilogRequestLogging();
 app.UseCors("AllowAngularApp");
 
+// Correlation ID middleware — generates/forwards X-Correlation-ID for all requests
+app.Use(async (context, next) =>
+{
+    const string header = "X-Correlation-ID";
+    var correlationId = context.Request.Headers.TryGetValue(header, out var existing)
+        ? existing.ToString()
+        : Guid.NewGuid().ToString();
+
+    context.Items["CorrelationId"] = correlationId;
+    context.Response.Headers.Append(header, correlationId);
+    // Ensure downstream services receive the header
+    context.Request.Headers[header] = correlationId;
+
+    using (Serilog.Context.LogContext.PushProperty("CorrelationId", correlationId))
+    {
+        await next();
+    }
+});
+
 // Add custom JWT validation middleware
 app.UseMiddleware<JwtValidationMiddleware>();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Map BFF controllers (before Ocelot so they take priority)
+app.MapControllers();
 
 // Use Ocelot for routing
 await app.UseOcelot();

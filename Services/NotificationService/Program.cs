@@ -6,6 +6,7 @@ using Microsoft.OpenApi.Models;
 var builder = WebApplication.CreateBuilder(args);
 
 // ============ SERILOG CONFIGURATION ============
+var seqUrl = builder.Configuration["Seq:ServerUrl"] ?? "http://seq:5341";
 builder.Host.UseSerilog((context, config) =>
 {
     config
@@ -14,8 +15,9 @@ builder.Host.UseSerilog((context, config) =>
         .WriteTo.File(
             "logs/notification-service-.txt",
             rollingInterval: RollingInterval.Day,
-            outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level}] {Message:lj}{NewLine}{Exception}"
+            outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level}] [{CorrelationId}] {Message:lj}{NewLine}{Exception}"
         )
+        .WriteTo.Seq(seqUrl)
         .Enrich.FromLogContext();
 });
 
@@ -25,10 +27,10 @@ builder.Services.AddMassTransit(x =>
     x.AddConsumers(typeof(Program).Assembly);
     x.UsingRabbitMq((context, cfg) =>
     {
-        cfg.Host("rabbitmq", h =>
+        cfg.Host(builder.Configuration["RabbitMQ:Host"] ?? "rabbitmq-service", h =>
         {
-            h.Username("guest");
-            h.Password("guest");
+            h.Username(builder.Configuration["RabbitMQ:Username"] ?? "guest");
+            h.Password(builder.Configuration["RabbitMQ:Password"] ?? "guest");
         });
         cfg.ConfigureEndpoints(context);
     });
@@ -120,5 +122,8 @@ if (app.Environment.IsDevelopment())
 
 // Map controllers
 app.MapControllers();
+
+// Health endpoint
+app.MapGet("/api/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow, service = "NotificationService" }));
 
 app.Run("http://localhost:5005");

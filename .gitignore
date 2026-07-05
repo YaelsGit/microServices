@@ -1,0 +1,19 @@
+# Build output
+**/bin/
+**/obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Logs (keep the directory, ignore the files)
+**/logs/*.txt
+
+# Environment secrets
+.env
+*.env.local
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,1 +1,0 @@
-[2026-07-01 13:07:12.732 +03:00] [WRN] As of ""2026-07-01T10:07:04.2277049+00:00"", the heartbeat has been running for ""00:00:06.1213040"" which is longer than ""00:00:01"". This could be caused by thread pool starvation.

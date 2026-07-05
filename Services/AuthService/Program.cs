@@ -11,6 +11,7 @@ using SharedModels.Utilities;
 var builder = WebApplication.CreateBuilder(args);
 
 // ============ SERILOG CONFIGURATION ============
+var seqUrl = builder.Configuration["Seq:ServerUrl"] ?? "http://seq:5341";
 builder.Host.UseSerilog((context, config) =>
 {
     config
@@ -19,8 +20,9 @@ builder.Host.UseSerilog((context, config) =>
         .WriteTo.File(
             "logs/auth-service-.txt",
             rollingInterval: RollingInterval.Day,
-            outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level}] {Message:lj}{NewLine}{Exception}"
+            outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level}] [{CorrelationId}] {Message:lj}{NewLine}{Exception}"
         )
+        .WriteTo.Seq(seqUrl)
         .Enrich.FromLogContext();
 });
 

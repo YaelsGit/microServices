@@ -1,358 +1,205 @@
 using Xunit;
 using Moq;
 using OrderService.Services;
-using OrderService.Repository;
+using OrderService.Interfaces;
+using OrderService.HttpClients;
 using SharedModels.Models;
-using System;
-using System.Threading.Tasks;
+using SharedModels.Dtos;
+using MassTransit;
 
 namespace OrderService.Tests;
 
-/// <summary>
-/// Unit tests for OrdersService - Business Logic
-/// Tests core order processing workflows and validations
-/// </summary>
 public class OrdersServiceTests
 {
     private readonly Mock<IOrdersRepository> _repositoryMock;
-    private readonly OrdersService _ordersService;
+    private readonly Mock<AuthServiceClient> _authClientMock;
+    private readonly Mock<CatalogServiceClient> _catalogClientMock;
+    private readonly Mock<IPublishEndpoint> _publishEndpointMock;
+    private readonly Mock<ILogger<OrdersService>> _loggerMock;
+    private readonly OrdersService _service;
 
     public OrdersServiceTests()
     {
         _repositoryMock = new Mock<IOrdersRepository>();
-        _ordersService = new OrdersService(_repositoryMock.Object);
+        _authClientMock = new Mock<AuthServiceClient>();
+        _catalogClientMock = new Mock<CatalogServiceClient>();
+        _publishEndpointMock = new Mock<IPublishEndpoint>();
+        _loggerMock = new Mock<ILogger<OrdersService>>();
+
+        _service = new OrdersService(
+            _repositoryMock.Object,
+            _authClientMock.Object,
+            _catalogClientMock.Object,
+            _publishEndpointMock.Object,
+            _loggerMock.Object);
     }
 
-    #region Order Creation Tests
+    // ── CreateOrderAsync ──────────────────────────────────────────────────
 
     [Fact]
-    public async Task CreateOrder_WithValidData_ShouldCreateOrder()
+    public async Task CreateOrderAsync_ValidRequest_ReturnsSuccess()
     {
-        // Arrange
-        var order = new Order
-        {
-            UserId = 1,
-            GiftId = 1,
-            Quantity = 2,
-            TotalPrice = 59.98m,
-            Status = "pending"
-        };
+        _authClientMock.Setup(c => c.UserExistsAsync(1)).ReturnsAsync(true);
+        _catalogClientMock.Setup(c => c.GetGiftAsync(1))
+            .ReturnsAsync((true, 50m, 10, "Gift A"));
+        _repositoryMock.Setup(r => r.CreateOrderAsync(It.IsAny<Order>())).ReturnsAsync(42);
+        _publishEndpointMock.Setup(p => p.Publish(It.IsAny<object>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
 
-        _repositoryMock
-            .Setup(r => r.CreateOrderAsync(It.IsAny<Order>()))
-            .ReturnsAsync(1);
+        var request = new DtoCreateOrderRequest { GiftId = 1, Quantity = 2 };
+        var (success, orderId, _) = await _service.CreateOrderAsync(1, request);
 
-        // Act
-        var result = await _ordersService.CreateOrderAsync(order);
-
-        // Assert
-        Assert.Equal(1, result);
-        _repositoryMock.Verify(r => r.CreateOrderAsync(It.IsAny<Order>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task CreateOrder_ShouldSetStatusToPending()
-    {
-        // Arrange
-        var order = new Order
-        {
-            UserId = 1,
-            GiftId = 1,
-            Quantity = 1,
-            TotalPrice = 29.99m
-        };
-
-        Order capturedOrder = null;
-        _repositoryMock
-            .Setup(r => r.CreateOrderAsync(It.IsAny<Order>()))
-            .Callback<Order>(o => capturedOrder = o)
-            .ReturnsAsync(1);
-
-        // Act
-        await _ordersService.CreateOrderAsync(order);
-
-        // Assert
-        Assert.NotNull(capturedOrder);
-        Assert.Equal("pending", capturedOrder.Status);
+        Assert.True(success);
+        Assert.Equal(42, orderId);
     }
 
     [Fact]
-    public async Task CreateOrder_WithInvalidQuantity_ShouldThrowException()
+    public async Task CreateOrderAsync_ZeroQuantity_ReturnsFail()
     {
-        // Arrange
-        var order = new Order
-        {
-            UserId = 1,
-            GiftId = 1,
-            Quantity = 0,  // Invalid
-            TotalPrice = 0
-        };
+        var request = new DtoCreateOrderRequest { GiftId = 1, Quantity = 0 };
+        var (success, _, message) = await _service.CreateOrderAsync(1, request);
 
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(() => _ordersService.CreateOrderAsync(order));
+        Assert.False(success);
+        Assert.NotEmpty(message);
     }
 
     [Fact]
-    public async Task CreateOrder_WithNegativePrice_ShouldThrowException()
+    public async Task CreateOrderAsync_UserNotFound_ReturnsFail()
     {
-        // Arrange
-        var order = new Order
-        {
-            UserId = 1,
-            GiftId = 1,
-            Quantity = 1,
-            TotalPrice = -29.99m  // Invalid
-        };
+        _authClientMock.Setup(c => c.UserExistsAsync(99)).ReturnsAsync(false);
 
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(() => _ordersService.CreateOrderAsync(order));
-    }
+        var request = new DtoCreateOrderRequest { GiftId = 1, Quantity = 1 };
+        var (success, _, _) = await _service.CreateOrderAsync(99, request);
 
-    #endregion
-
-    #region Order Cancellation Tests
-
-    [Fact]
-    public async Task CancelOrder_WithPendingStatus_ShouldCancel()
-    {
-        // Arrange
-        var order = new Order
-        {
-            OrderId = 1,
-            UserId = 1,
-            GiftId = 1,
-            Status = "pending",
-            Quantity = 1,
-            TotalPrice = 29.99m
-        };
-
-        _repositoryMock
-            .Setup(r => r.GetOrderByIdAsync(1))
-            .ReturnsAsync(order);
-
-        _repositoryMock
-            .Setup(r => r.CancelOrderAsync(1))
-            .ReturnsAsync(true);
-
-        // Act
-        var result = await _ordersService.CancelOrderAsync(1);
-
-        // Assert
-        Assert.True(result);
-        _repositoryMock.Verify(r => r.CancelOrderAsync(1), Times.Once);
+        Assert.False(success);
     }
 
     [Fact]
-    public async Task CancelOrder_WithCompletedStatus_ShouldThrowException()
+    public async Task CreateOrderAsync_GiftNotFound_ReturnsFail()
     {
-        // Arrange
-        var order = new Order
-        {
-            OrderId = 1,
-            Status = "completed"  // Cannot cancel completed orders
-        };
+        _authClientMock.Setup(c => c.UserExistsAsync(1)).ReturnsAsync(true);
+        _catalogClientMock.Setup(c => c.GetGiftAsync(999))
+            .ReturnsAsync((false, 0m, 0, string.Empty));
 
-        _repositoryMock
-            .Setup(r => r.GetOrderByIdAsync(1))
-            .ReturnsAsync(order);
+        var request = new DtoCreateOrderRequest { GiftId = 999, Quantity = 1 };
+        var (success, _, _) = await _service.CreateOrderAsync(1, request);
 
-        // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _ordersService.CancelOrderAsync(1)
-        );
-        _repositoryMock.Verify(r => r.CancelOrderAsync(It.IsAny<int>()), Times.Never);
+        Assert.False(success);
     }
+
+    // ── GetOrderByIdAsync ─────────────────────────────────────────────────
 
     [Fact]
-    public async Task CancelOrder_WithCancelledStatus_ShouldThrowException()
+    public async Task GetOrderByIdAsync_ExistingOrder_ReturnsDto()
     {
-        // Arrange
-        var order = new Order
-        {
-            OrderId = 1,
-            Status = "cancelled"  // Already cancelled
-        };
+        var order = new Order { OrderId = 5, UserId = 1, GiftId = 1, Quantity = 1, TotalPrice = 50m, Status = "Pending" };
+        _repositoryMock.Setup(r => r.GetOrderByIdAsync(5)).ReturnsAsync(order);
 
-        _repositoryMock
-            .Setup(r => r.GetOrderByIdAsync(1))
-            .ReturnsAsync(order);
+        var result = await _service.GetOrderByIdAsync(5);
 
-        // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _ordersService.CancelOrderAsync(1)
-        );
-    }
-
-    [Fact]
-    public async Task CancelOrder_WithNonExistentOrder_ShouldThrowException()
-    {
-        // Arrange
-        _repositoryMock
-            .Setup(r => r.GetOrderByIdAsync(999))
-            .ReturnsAsync((Order)null);
-
-        // Act & Assert
-        await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => _ordersService.CancelOrderAsync(999)
-        );
-    }
-
-    #endregion
-
-    #region Order Status Tests
-
-    [Theory]
-    [InlineData("pending")]
-    [InlineData("completed")]
-    [InlineData("cancelled")]
-    public async Task GetOrdersByStatus_ShouldReturnOrdersWithMatchingStatus(string status)
-    {
-        // Arrange
-        var orders = new List<Order>
-        {
-            new Order { OrderId = 1, Status = status, UserId = 1, GiftId = 1, Quantity = 1, TotalPrice = 29.99m },
-            new Order { OrderId = 2, Status = status, UserId = 2, GiftId = 2, Quantity = 2, TotalPrice = 59.98m }
-        };
-
-        _repositoryMock
-            .Setup(r => r.GetOrdersByStatusAsync(status))
-            .ReturnsAsync(orders);
-
-        // Act
-        var result = await _ordersService.GetOrdersByStatusAsync(status);
-
-        // Assert
         Assert.NotNull(result);
-        Assert.Equal(2, result.Count);
-        Assert.All(result, o => Assert.Equal(status, o.Status));
+        Assert.Equal(5, result!.OrderId);
     }
 
     [Fact]
-    public async Task GetOrdersByStatus_WithInvalidStatus_ShouldReturnEmptyList()
+    public async Task GetOrderByIdAsync_NonExistent_ReturnsNull()
     {
-        // Arrange
-        _repositoryMock
-            .Setup(r => r.GetOrdersByStatusAsync("invalid"))
-            .ReturnsAsync(new List<Order>());
+        _repositoryMock.Setup(r => r.GetOrderByIdAsync(999)).ReturnsAsync((Order?)null);
 
-        // Act
-        var result = await _ordersService.GetOrdersByStatusAsync("invalid");
+        var result = await _service.GetOrderByIdAsync(999);
 
-        // Assert
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetOrderByIdAsync_InvalidId_ReturnsNull()
+    {
+        var result = await _service.GetOrderByIdAsync(0);
+        Assert.Null(result);
+    }
+
+    // ── GetUserOrdersAsync ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetUserOrdersAsync_UserExists_ReturnsOrders()
+    {
+        _authClientMock.Setup(c => c.UserExistsAsync(1)).ReturnsAsync(true);
+        _repositoryMock.Setup(r => r.GetOrdersByUserIdAsync(1))
+            .ReturnsAsync(new List<Order>
+            {
+                new Order { OrderId = 1, UserId = 1, GiftId = 1, Quantity = 1, TotalPrice = 50m, Status = "Confirmed" },
+                new Order { OrderId = 2, UserId = 1, GiftId = 2, Quantity = 2, TotalPrice = 100m, Status = "Pending" }
+            });
+
+        var result = (await _service.GetUserOrdersAsync(1)).ToList();
+
+        Assert.Equal(2, result.Count);
+    }
+
+    [Fact]
+    public async Task GetUserOrdersAsync_UserNotFound_ReturnsEmpty()
+    {
+        _authClientMock.Setup(c => c.UserExistsAsync(99)).ReturnsAsync(false);
+
+        var result = await _service.GetUserOrdersAsync(99);
+
         Assert.Empty(result);
     }
 
-    #endregion
-
-    #region Revenue Tests
+    // ── CancelOrderAsync ──────────────────────────────────────────────────
 
     [Fact]
-    public async Task GetTotalRevenue_ShouldSumCompletedOrderPrices()
+    public async Task CancelOrderAsync_PendingOrder_ReturnsSuccess()
     {
-        // Arrange
-        decimal expectedRevenue = 1234.56m;
+        var order = new Order { OrderId = 1, Status = "Pending" };
+        _repositoryMock.Setup(r => r.GetOrderByIdAsync(1)).ReturnsAsync(order);
+        _repositoryMock.Setup(r => r.UpdateOrderAsync(It.IsAny<Order>())).ReturnsAsync(true);
 
-        _repositoryMock
-            .Setup(r => r.GetTotalRevenueAsync())
-            .ReturnsAsync(expectedRevenue);
+        var (success, _) = await _service.CancelOrderAsync(1);
 
-        // Act
-        var result = await _ordersService.GetTotalRevenueAsync();
-
-        // Assert
-        Assert.Equal(expectedRevenue, result);
+        Assert.True(success);
     }
 
     [Fact]
-    public async Task GetTotalRevenue_ShouldNotIncludePendingOrders()
+    public async Task CancelOrderAsync_ConfirmedOrder_ReturnsFail()
     {
-        // Arrange - Only completed orders included in revenue calculation
-        _repositoryMock
-            .Setup(r => r.GetTotalRevenueAsync())
-            .ReturnsAsync(500m);
+        var order = new Order { OrderId = 1, Status = "Confirmed" };
+        _repositoryMock.Setup(r => r.GetOrderByIdAsync(1)).ReturnsAsync(order);
 
-        // Act
-        var result = await _ordersService.GetTotalRevenueAsync();
+        var (success, message) = await _service.CancelOrderAsync(1);
 
-        // Assert
-        Assert.Equal(500m, result);
-        _repositoryMock.Verify(r => r.GetTotalRevenueAsync(), Times.Once);
+        Assert.False(success);
+        Assert.NotEmpty(message);
     }
 
-    #endregion
+    [Fact]
+    public async Task CancelOrderAsync_OrderNotFound_ReturnsFail()
+    {
+        _repositoryMock.Setup(r => r.GetOrderByIdAsync(999)).ReturnsAsync((Order?)null);
 
-    #region User Orders Tests
+        var (success, _) = await _service.CancelOrderAsync(999);
+
+        Assert.False(success);
+    }
+
+    // ── GetOrdersByGiftAsync ──────────────────────────────────────────────
 
     [Fact]
-    public async Task GetUserOrders_ShouldReturnAllOrdersForUser()
+    public async Task GetOrdersByGiftAsync_ReturnsGroupedReport()
     {
-        // Arrange
-        int userId = 42;
-        var userOrders = new List<Order>
-        {
-            new Order { OrderId = 1, UserId = userId, Status = "completed" },
-            new Order { OrderId = 2, UserId = userId, Status = "pending" }
-        };
+        _repositoryMock.Setup(r => r.GetAllOrdersAsync())
+            .ReturnsAsync(new List<Order>
+            {
+                new Order { GiftId = 1, Quantity = 2, TotalPrice = 100m, Status = "Confirmed" },
+                new Order { GiftId = 1, Quantity = 1, TotalPrice = 50m,  Status = "Confirmed" },
+                new Order { GiftId = 2, Quantity = 3, TotalPrice = 150m, Status = "Confirmed" }
+            });
 
-        _repositoryMock
-            .Setup(r => r.GetOrdersByUserIdAsync(userId))
-            .ReturnsAsync(userOrders);
+        var result = (await _service.GetOrdersByGiftAsync()).ToList();
 
-        // Act
-        var result = await _ordersService.GetUserOrdersAsync(userId);
-
-        // Assert
-        Assert.NotNull(result);
         Assert.Equal(2, result.Count);
-        Assert.All(result, o => Assert.Equal(userId, o.UserId));
+        var gift1 = result.First(r => r.GiftId == 1);
+        Assert.Equal(3, gift1.TotalOrdered);
+        Assert.Equal(150m, gift1.TotalRevenue);
     }
-
-    [Fact]
-    public async Task GetUserOrders_WithNoOrders_ShouldReturnEmptyList()
-    {
-        // Arrange
-        _repositoryMock
-            .Setup(r => r.GetOrdersByUserIdAsync(999))
-            .ReturnsAsync(new List<Order>());
-
-        // Act
-        var result = await _ordersService.GetUserOrdersAsync(999);
-
-        // Assert
-        Assert.Empty(result);
-    }
-
-    #endregion
-
-    #region Price Calculation Tests
-
-    [Theory]
-    [InlineData(1, 29.99, 29.99)]       // 1 × 29.99 = 29.99
-    [InlineData(2, 29.99, 59.98)]       // 2 × 29.99 = 59.98
-    [InlineData(5, 10.00, 50.00)]       // 5 × 10.00 = 50.00
-    [InlineData(100, 1.50, 150.00)]     // 100 × 1.50 = 150.00
-    public async Task CalculateOrderTotal_ShouldMultiplyQuantityByPrice(
-        int quantity, decimal unitPrice, decimal expectedTotal)
-    {
-        // Arrange
-        var order = new Order
-        {
-            UserId = 1,
-            GiftId = 1,
-            Quantity = quantity,
-            TotalPrice = unitPrice * quantity
-        };
-
-        _repositoryMock
-            .Setup(r => r.CreateOrderAsync(It.IsAny<Order>()))
-            .ReturnsAsync(1);
-
-        // Act
-        await _ordersService.CreateOrderAsync(order);
-
-        // Assert
-        Assert.Equal(expectedTotal, order.TotalPrice);
-    }
-
-    #endregion
 }

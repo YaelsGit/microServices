@@ -1,30 +1,50 @@
-version: '3.8'
 
 services:
   # SQL Server Database - Each service has its own database
   mssql-db:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: mechira-mssql-db
+    user: root
     ports:
       - "1433:1433"
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: "YourPasswordHere123!"
       MSSQL_PID: "Developer"
+  
     volumes:
       - mssql-data:/var/opt/mssql/data
       - mssql-log:/var/opt/mssql/log
       - mssql-backup:/var/opt/mssql/backup
       - ./init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql
+    
     networks:
       - mechira-network
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P YourPasswordHere123! -Q 'SELECT 1' || exit 1"]
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P YourPasswordHere123! -Q 'SELECT 1' -C || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 10s
 
+  seq:
+    image: datalust/seq:latest
+    container_name: seq-logs
+    ports:
+      - "8081:80"
+      - "5341:5341"
+    environment:
+      - ACCEPT_EULA=Y
+    volumes:
+      - seq-data:/data
+    networks:
+      - mechira-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
   # AuthService
   auth-service:
     build:
@@ -50,28 +70,55 @@ services:
         condition: service_healthy
     networks:
       - mechira-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5001/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     restart: unless-stopped
 
-  # CatalogService
-  catalog-service:
+  # MongoDB - Document database for CatalogService Gifts (Polyglot Persistence)
+  mongodb:
+    image: mongo:7.0
+    container_name: mechira-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - mechira-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  # CatalogService - Replica 1 (behind Nginx load balancer)
+  catalog-service-1:
     build:
       context: .
       dockerfile: Services/CatalogService/Dockerfile
-    container_name: mechira-catalog-service
-    ports:
-      - "5002:5002"
+    container_name: mechira-catalog-service-1
+    # No direct port exposure — traffic goes through nginx-catalog
     environment:
       ASPNETCORE_URLS: http://+:5002
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__DefaultConnection: "Server=mssql-db,1433;Database=Mechira-CatalogService;User Id=sa;Password=YourPasswordHere123!;TrustServerCertificate=true;Encrypt=false;"
+      ConnectionStrings__MongoConnection: "mongodb://mongodb:27017"
       Jwt__SecretKey: "your-super-secret-key-that-must-be-at-least-32-characters-long-for-hmac256"
       Jwt__Issuer: "AuthService"
       Jwt__Audience: "MicroservicesApi"
       Jwt__ExpiryMinutes: "60"
       ServiceUrls__AuthService: "http://auth-service:5001"
-      ServiceUrls__CatalogService: "http://catalog-service:5002"
+      ServiceUrls__CatalogService: "http://nginx-catalog:5002"
       ServiceUrls__OrderService: "http://order-service:5003"
       ServiceUrls__LotteryService: "http://lottery-service:5004"
+      RabbitMQ__Host: "rabbitmq-service"
+      RabbitMQ__Username: "guest"
+      RabbitMQ__Password: "guest"
     depends_on:
       mssql-db:
         condition: service_healthy
@@ -79,6 +126,63 @@ services:
         condition: service_started
       redis-cache:
         condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      rabbitmq-service:
+        condition: service_healthy
+    networks:
+      - mechira-network
+    restart: unless-stopped
+
+  # CatalogService - Replica 2 (behind Nginx load balancer)
+  catalog-service-2:
+    build:
+      context: .
+      dockerfile: Services/CatalogService/Dockerfile
+    container_name: mechira-catalog-service-2
+    environment:
+      ASPNETCORE_URLS: http://+:5002
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: "Server=mssql-db,1433;Database=Mechira-CatalogService;User Id=sa;Password=YourPasswordHere123!;TrustServerCertificate=true;Encrypt=false;"
+      ConnectionStrings__MongoConnection: "mongodb://mongodb:27017"
+      Jwt__SecretKey: "your-super-secret-key-that-must-be-at-least-32-characters-long-for-hmac256"
+      Jwt__Issuer: "AuthService"
+      Jwt__Audience: "MicroservicesApi"
+      Jwt__ExpiryMinutes: "60"
+      ServiceUrls__AuthService: "http://auth-service:5001"
+      ServiceUrls__CatalogService: "http://nginx-catalog:5002"
+      ServiceUrls__OrderService: "http://order-service:5003"
+      ServiceUrls__LotteryService: "http://lottery-service:5004"
+      RabbitMQ__Host: "rabbitmq-service"
+      RabbitMQ__Username: "guest"
+      RabbitMQ__Password: "guest"
+    depends_on:
+      mssql-db:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      redis-cache:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      rabbitmq-service:
+        condition: service_healthy
+    networks:
+      - mechira-network
+    restart: unless-stopped
+
+  # Nginx Load Balancer for CatalogService (round-robin across 2 replicas)
+  # Proof: call GET /catalog/gifts repeatedly and observe X-Upstream-Server header alternating
+  nginx-catalog:
+    image: nginx:alpine
+    container_name: mechira-nginx-catalog
+    ports:
+      - "5002:5002"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - catalog-service-1
+      - catalog-service-2
     networks:
       - mechira-network
     restart: unless-stopped
@@ -100,7 +204,7 @@ services:
       Jwt__Audience: "MicroservicesApi"
       Jwt__ExpiryMinutes: "60"
       ServiceUrls__AuthService: "http://auth-service:5001"
-      ServiceUrls__CatalogService: "http://catalog-service:5002"
+      ServiceUrls__CatalogService: "http://nginx-catalog:5002"
       ServiceUrls__OrderService: "http://order-service:5003"
       ServiceUrls__LotteryService: "http://lottery-service:5004"
     depends_on:
@@ -110,8 +214,16 @@ services:
         condition: service_started
       rabbitmq-service:
         condition: service_healthy
+      nginx-catalog:
+        condition: service_started
     networks:
       - mechira-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5003/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     restart: unless-stopped
 
   # LotteryService
@@ -141,6 +253,12 @@ services:
         condition: service_started
     networks:
       - mechira-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5004/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     restart: unless-stopped
 
   # NotificationService (Event-driven notification service)
@@ -158,11 +276,20 @@ services:
       Jwt__Issuer: "AuthService"
       Jwt__Audience: "MicroservicesApi"
       Jwt__ExpiryMinutes: "60"
+      RabbitMQ__Host: "rabbitmq-service"
+      RabbitMQ__Username: "guest"
+      RabbitMQ__Password: "guest"
     depends_on:
       rabbitmq-service:
         condition: service_healthy
     networks:
       - mechira-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5005/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     restart: unless-stopped
 
   # API Gateway
@@ -182,12 +309,14 @@ services:
       Jwt__ExpiryMinutes: "60"
       # Gateway routing configuration (update if using environment variable configuration)
       ServiceUrls__AuthService: "http://auth-service:5001"
-      ServiceUrls__CatalogService: "http://catalog-service:5002"
+      ServiceUrls__CatalogService: "http://nginx-catalog:5002"
       ServiceUrls__OrderService: "http://order-service:5003"
       ServiceUrls__LotteryService: "http://lottery-service:5004"
     depends_on:
       - auth-service
-      - catalog-service
+      - catalog-service-1
+      - catalog-service-2
+      - nginx-catalog
       - order-service
       - lottery-service
     networks:
@@ -248,5 +377,9 @@ volumes:
     driver: local
   rabbitmq-data:
     driver: local
+  mongodb-data:
+    driver: local
   redis-data:
+    driver: local
+  seq-data:
     driver: local

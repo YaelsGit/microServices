@@ -1,261 +1,184 @@
 using SharedModels.Models;
 using SharedModels.Dtos;
-using SharedModels.Constants;
 using CatalogService.Interfaces;
+using CatalogService.Services.Cache;
 
 namespace CatalogService.Services;
 
-/// <summary>
-/// Service implementation for Gift business logic
-/// Handles CRUD operations, filtering, and gift-related business rules
-/// </summary>
 public class GiftsService : IGiftsService
 {
     private readonly IGiftsRepository _repository;
+    private readonly ICacheService _cache;
     private readonly ILogger<GiftsService> _logger;
 
-    public GiftsService(IGiftsRepository repository, ILogger<GiftsService> logger)
+    private const string AllGiftsCacheKey = "gifts:all";
+    private static string GiftCacheKey(int id) => $"gifts:{id}";
+
+    public GiftsService(IGiftsRepository repository, ICacheService cache, ILogger<GiftsService> logger)
     {
         _repository = repository;
+        _cache = cache;
         _logger = logger;
     }
 
-    /// <summary>
-    /// Get all gifts
-    /// </summary>
     public async Task<IEnumerable<DtoGifts>> GetAllGiftsAsync()
     {
-        try
+        var cached = await _cache.GetAsync<List<DtoGifts>>(AllGiftsCacheKey);
+        if (cached != null)
         {
-            var gifts = await _repository.GetAllGiftsAsync();
-            return gifts.Select(g => MapToDto(g));
+            _logger.LogInformation("[CACHE HIT] Key: {Key} — returning {Count} gifts from Redis", AllGiftsCacheKey, cached.Count);
+            return cached;
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting all gifts");
-            throw;
-        }
+
+        _logger.LogInformation("[CACHE MISS] Key: {Key} — fetching from MongoDB", AllGiftsCacheKey);
+        var gifts = await _repository.GetAllGiftsAsync();
+        var result = gifts.Select(MapToDto).ToList();
+
+        await _cache.SetAsync(AllGiftsCacheKey, result);
+        return result;
     }
 
-    /// <summary>
-    /// Get gift by ID
-    /// </summary>
     public async Task<DtoGifts?> GetGiftByIdAsync(int giftId)
     {
-        try
-        {
-            if (giftId <= 0)
-                return null;
+        if (giftId <= 0) return null;
 
-            var gift = await _repository.GetGiftByIdAsync(giftId);
-            return gift == null ? null : MapToDto(gift);
-        }
-        catch (Exception ex)
+        var key = GiftCacheKey(giftId);
+        var cached = await _cache.GetAsync<DtoGifts>(key);
+        if (cached != null)
         {
-            _logger.LogError(ex, $"Error getting gift: {giftId}");
-            throw;
+            _logger.LogInformation("[CACHE HIT] Key: {Key} — returning gift from Redis", key);
+            return cached;
         }
+
+        _logger.LogInformation("[CACHE MISS] Key: {Key} — fetching from MongoDB", key);
+        var gift = await _repository.GetGiftByIdAsync(giftId);
+        if (gift == null) return null;
+
+        var dto = MapToDto(gift);
+        await _cache.SetAsync(key, dto);
+        return dto;
     }
 
-    /// <summary>
-    /// Create new gift
-    /// </summary>
     public async Task<int> CreateGiftAsync(DtoCreateGiftRequest request)
     {
-        try
-        {
-            // Validate input
-            if (string.IsNullOrWhiteSpace(request.Name) || request.Quantity < 0 || request.Price <= 0)
-            {
-                _logger.LogWarning("Create gift attempt with invalid data");
-                throw new ArgumentException("Invalid gift data");
-            }
+        if (string.IsNullOrWhiteSpace(request.Name) || request.Quantity < 0 || request.Price <= 0)
+            throw new ArgumentException("Invalid gift data");
 
-            var gift = new Gift
-            {
-                Name = request.Name,
-                Description = request.Description,
-                Price = request.Price,
-                Quantity = request.Quantity,
-                DonorId = request.DonorId,
-                CategoryId = request.CategoryId
-            };
-
-            var giftId = await _repository.CreateGiftAsync(gift);
-            _logger.LogInformation($"New gift created: {giftId}");
-            return giftId;
-        }
-        catch (Exception ex)
+        var gift = new Gift
         {
-            _logger.LogError(ex, "Error creating gift");
-            throw;
-        }
+            Name = request.Name,
+            Description = request.Description,
+            Price = request.Price,
+            Quantity = request.Quantity,
+            DonorId = request.DonorId,
+            CategoryId = request.CategoryId
+        };
+
+        var giftId = await _repository.CreateGiftAsync(gift);
+
+        // Invalidate the all-gifts cache so next read fetches fresh data
+        await _cache.RemoveAsync(AllGiftsCacheKey);
+        _logger.LogInformation("[CACHE INVALIDATE] Key: {Key} — new gift {GiftId} created", AllGiftsCacheKey, giftId);
+
+        return giftId;
     }
 
-    /// <summary>
-    /// Update gift
-    /// </summary>
     public async Task<bool> UpdateGiftAsync(int giftId, DtoUpdateGiftRequest request)
     {
-        try
-        {
-            var gift = await _repository.GetGiftByIdAsync(giftId);
-            if (gift == null)
-            {
-                _logger.LogWarning($"Update gift attempt for non-existent gift: {giftId}");
-                return false;
-            }
+        var gift = await _repository.GetGiftByIdAsync(giftId);
+        if (gift == null) return false;
 
-            // Update only provided fields
-            if (!string.IsNullOrWhiteSpace(request.Name))
-                gift.Name = request.Name;
-            if (!string.IsNullOrWhiteSpace(request.Description))
-                gift.Description = request.Description;
-            if (request.Price.HasValue && request.Price > 0)
-                gift.Price = request.Price.Value;
-            if (request.Quantity.HasValue && request.Quantity >= 0)
-                gift.Quantity = request.Quantity.Value;
-            if (request.DonorId.HasValue && request.DonorId > 0)
-                gift.DonorId = request.DonorId.Value;
-            if (request.CategoryId.HasValue && request.CategoryId > 0)
-                gift.CategoryId = request.CategoryId.Value;
+        if (!string.IsNullOrWhiteSpace(request.Name)) gift.Name = request.Name;
+        if (!string.IsNullOrWhiteSpace(request.Description)) gift.Description = request.Description;
+        if (request.Price.HasValue && request.Price > 0) gift.Price = request.Price.Value;
+        if (request.Quantity.HasValue && request.Quantity >= 0) gift.Quantity = request.Quantity.Value;
+        if (request.DonorId.HasValue && request.DonorId > 0) gift.DonorId = request.DonorId.Value;
+        if (request.CategoryId.HasValue && request.CategoryId > 0) gift.CategoryId = request.CategoryId.Value;
 
-            var success = await _repository.UpdateGiftAsync(gift);
-            if (success)
-            {
-                _logger.LogInformation($"Gift updated: {giftId}");
-            }
-            return success;
-        }
-        catch (Exception ex)
+        var success = await _repository.UpdateGiftAsync(gift);
+        if (success)
         {
-            _logger.LogError(ex, $"Error updating gift: {giftId}");
-            throw;
+            // Invalidate both the individual and list caches
+            await Task.WhenAll(
+                _cache.RemoveAsync(GiftCacheKey(giftId)),
+                _cache.RemoveAsync(AllGiftsCacheKey));
+            _logger.LogInformation("[CACHE INVALIDATE] Keys: {Key1}, {Key2} — gift {GiftId} updated",
+                GiftCacheKey(giftId), AllGiftsCacheKey, giftId);
         }
+        return success;
     }
 
-    /// <summary>
-    /// Delete gift
-    /// </summary>
     public async Task<bool> DeleteGiftAsync(int giftId)
     {
-        try
+        var success = await _repository.DeleteGiftAsync(giftId);
+        if (success)
         {
-            var success = await _repository.DeleteGiftAsync(giftId);
-            if (success)
-            {
-                _logger.LogInformation($"Gift deleted: {giftId}");
-            }
-            return success;
+            await Task.WhenAll(
+                _cache.RemoveAsync(GiftCacheKey(giftId)),
+                _cache.RemoveAsync(AllGiftsCacheKey));
+            _logger.LogInformation("[CACHE INVALIDATE] Keys: {Key1}, {Key2} — gift {GiftId} deleted",
+                GiftCacheKey(giftId), AllGiftsCacheKey, giftId);
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, $"Error deleting gift: {giftId}");
-            throw;
-        }
+        return success;
     }
 
-    /// <summary>
-    /// Update gift quantity
-    /// </summary>
     public async Task<bool> UpdateGiftQuantityAsync(int giftId, int quantityChange)
     {
-        try
-        {
-            var gift = await _repository.GetGiftByIdAsync(giftId);
-            if (gift == null)
-            {
-                _logger.LogWarning($"Update quantity attempt for non-existent gift: {giftId}");
-                return false;
-            }
+        var gift = await _repository.GetGiftByIdAsync(giftId);
+        if (gift == null) return false;
 
-            var success = await _repository.UpdateGiftQuantityAsync(giftId, quantityChange);
-            if (success)
-            {
-                _logger.LogInformation($"Gift {giftId} quantity updated by: {quantityChange}");
-            }
-            return success;
-        }
-        catch (Exception ex)
+        var success = await _repository.UpdateGiftQuantityAsync(giftId, quantityChange);
+        if (success)
         {
-            _logger.LogError(ex, $"Error updating gift quantity: {giftId}");
-            throw;
+            await Task.WhenAll(
+                _cache.RemoveAsync(GiftCacheKey(giftId)),
+                _cache.RemoveAsync(AllGiftsCacheKey));
+            _logger.LogInformation("[CACHE INVALIDATE] Keys: {Key1}, {Key2} — gift {GiftId} quantity changed by {Delta}",
+                GiftCacheKey(giftId), AllGiftsCacheKey, giftId, quantityChange);
         }
+        return success;
     }
 
-    /// <summary>
-    /// Get gifts by price range
-    /// </summary>
     public async Task<IEnumerable<DtoGifts>> GetGiftsByPriceRangeAsync(decimal minPrice, decimal maxPrice)
     {
-        try
-        {
-            // Validate price range
-            if (minPrice < 0 || maxPrice < 0 || minPrice > maxPrice)
-            {
-                _logger.LogWarning("Invalid price range requested");
-                return Enumerable.Empty<DtoGifts>();
-            }
+        if (minPrice < 0 || maxPrice < 0 || minPrice > maxPrice)
+            return Enumerable.Empty<DtoGifts>();
 
-            var gifts = await _repository.GetGiftsByPriceRangeAsync(minPrice, maxPrice);
-            return gifts.Select(g => MapToDto(g));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting gifts by price range");
-            throw;
-        }
+        // Price-range queries are not cached (too many combinations) — go straight to MongoDB
+        _logger.LogInformation("[CACHE SKIP] Price-range query ({Min}-{Max}) — fetching from MongoDB", minPrice, maxPrice);
+        var gifts = await _repository.GetGiftsByPriceRangeAsync(minPrice, maxPrice);
+        return gifts.Select(MapToDto);
     }
 
-    /// <summary>
-    /// Get filtered gifts
-    /// </summary>
     public async Task<IEnumerable<DtoGifts>> GetFilteredGiftsAsync(DtoGiftFilter filter)
     {
-        try
-        {
-            var gifts = await _repository.GetFilteredGiftsAsync(
-                filter.CategoryId, 
-                filter.DonorId, 
-                filter.MinPrice, 
-                filter.MaxPrice);
+        // Filtered queries are not cached — go straight to MongoDB
+        _logger.LogInformation("[CACHE SKIP] Filtered query — fetching from MongoDB");
+        var gifts = await _repository.GetFilteredGiftsAsync(
+            filter.CategoryId, filter.DonorId, filter.MinPrice, filter.MaxPrice);
 
-            // Apply search filter if provided
-            if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
-            {
-                gifts = gifts
-                    .Where(g => g.Name.Contains(filter.SearchTerm, StringComparison.OrdinalIgnoreCase) ||
-                               g.Description.Contains(filter.SearchTerm, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-            }
-
-            return gifts.Select(g => MapToDto(g));
-        }
-        catch (Exception ex)
+        if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
         {
-            _logger.LogError(ex, "Error getting filtered gifts");
-            throw;
+            gifts = gifts.Where(g =>
+                g.Name.Contains(filter.SearchTerm, StringComparison.OrdinalIgnoreCase) ||
+                g.Description.Contains(filter.SearchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
         }
+
+        return gifts.Select(MapToDto);
     }
 
-    /// <summary>
-    /// Helper method to map Gift to DtoGifts
-    /// </summary>
-    private DtoGifts MapToDto(Gift gift)
+    private static DtoGifts MapToDto(Gift gift) => new()
     {
-        return new DtoGifts
-        {
-            GiftId = gift.GiftId,
-            Name = gift.Name,
-            Description = gift.Description,
-            Price = gift.Price,
-            Quantity = gift.Quantity,
-            DonorId = gift.DonorId,
-            CategoryId = gift.CategoryId,
-            DonorName = string.Empty, // Would be populated from CatalogService
-            CategoryName = string.Empty, // Would be populated from CatalogService
-            CreatedAt = gift.CreatedAt,
-            UpdatedAt = gift.UpdatedAt
-        };
-    }
+        GiftId = gift.GiftId,
+        Name = gift.Name,
+        Description = gift.Description,
+        Price = gift.Price,
+        Quantity = gift.Quantity,
+        DonorId = gift.DonorId,
+        CategoryId = gift.CategoryId,
+        DonorName = string.Empty,
+        CategoryName = string.Empty,
+        CreatedAt = gift.CreatedAt,
+        UpdatedAt = gift.UpdatedAt
+    };
 }

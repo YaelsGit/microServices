@@ -1,22 +1,19 @@
-using Serilog;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
 using OrderService.Data;
-using OrderService.Repository;
-using OrderService.Services;
+using OrderService.HttpClients;
 using OrderService.Interfaces;
 using OrderService.Middleware;
-using OrderService.Extensions;
-using OrderService.HttpClients;
+using OrderService.Repository;
+using OrderService.Services;
+using Serilog;
 using SharedModels.Utilities;
-using Microsoft.OpenApi.Models;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.Extensions.Http.Resilience;
-using Polly;
-using MassTransit;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // ============ SERILOG CONFIGURATION ============
+var seqUrl = builder.Configuration["Seq:ServerUrl"] ?? "http://seq:5341";
 builder.Host.UseSerilog((context, config) =>
 {
     config
@@ -25,8 +22,9 @@ builder.Host.UseSerilog((context, config) =>
         .WriteTo.File(
             "logs/order-service-.txt",
             rollingInterval: RollingInterval.Day,
-            outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level}] {Message:lj}{NewLine}{Exception}"
+            outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level}] [{CorrelationId}] {Message:lj}{NewLine}{Exception}"
         )
+        .WriteTo.Seq(seqUrl)
         .Enrich.FromLogContext();
 });
 
@@ -47,6 +45,7 @@ builder.Services.AddScoped<IOrdersService, OrdersService>();
 
 // Utilities
 builder.Services.AddSingleton<JwtTokenService>();
+builder.Services.AddHttpContextAccessor();
 
 // ============ HTTP CLIENT CONFIGURATION WITH POLLY RESILIENCE ============
 // AuthService HTTP Client with resilience policies
@@ -56,38 +55,7 @@ builder.Services.AddHttpClient<AuthServiceClient>(client =>
     client.DefaultRequestHeaders.Add("Accept", "application/json");
     client.Timeout = TimeSpan.FromSeconds(5);
 })
-    .AddResilienceHandler("auth-service-resilience", builder =>
-    {
-        // Retry policy with exponential backoff
-        builder.AddRetry(new HttpRetryStrategyOptions
-        {
-            MaxRetryAttempts = 3,
-            BackoffType = DelayBackoffType.Exponential,
-            Delay = TimeSpan.FromSeconds(2),
-            ShouldHandle = args => args.Outcome switch
-            {
-                { Exception: HttpRequestException } => PredicateResult.True(),
-                { Result.StatusCode: System.Net.HttpStatusCode.RequestTimeout } => PredicateResult.True(),
-                { Result.StatusCode: >= System.Net.HttpStatusCode.InternalServerError } => PredicateResult.True(),
-                _ => PredicateResult.False(),
-            }
-        });
-        
-        // Circuit breaker policy
-        builder.AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions
-        {
-            FailureRatio = 0.5,
-            MinimumThroughput = 5,
-            SamplingDuration = TimeSpan.FromSeconds(30),
-            BreakDuration = TimeSpan.FromSeconds(30),
-            ShouldHandle = args => args.Outcome switch
-            {
-                { Exception: HttpRequestException } => PredicateResult.True(),
-                { Result.StatusCode: >= System.Net.HttpStatusCode.InternalServerError } => PredicateResult.True(),
-                _ => PredicateResult.False(),
-            }
-        });
-    });
+    .AddStandardResilienceHandler();
 
 // CatalogService HTTP Client with resilience policies
 builder.Services.AddHttpClient<CatalogServiceClient>(client =>
@@ -96,38 +64,7 @@ builder.Services.AddHttpClient<CatalogServiceClient>(client =>
     client.DefaultRequestHeaders.Add("Accept", "application/json");
     client.Timeout = TimeSpan.FromSeconds(5);
 })
-    .AddResilienceHandler("catalog-service-resilience", builder =>
-    {
-        // Retry policy with exponential backoff
-        builder.AddRetry(new HttpRetryStrategyOptions
-        {
-            MaxRetryAttempts = 3,
-            BackoffType = DelayBackoffType.Exponential,
-            Delay = TimeSpan.FromSeconds(2),
-            ShouldHandle = args => args.Outcome switch
-            {
-                { Exception: HttpRequestException } => PredicateResult.True(),
-                { Result.StatusCode: System.Net.HttpStatusCode.RequestTimeout } => PredicateResult.True(),
-                { Result.StatusCode: >= System.Net.HttpStatusCode.InternalServerError } => PredicateResult.True(),
-                _ => PredicateResult.False(),
-            }
-        });
-        
-        // Circuit breaker policy
-        builder.AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions
-        {
-            FailureRatio = 0.5,
-            MinimumThroughput = 5,
-            SamplingDuration = TimeSpan.FromSeconds(30),
-            BreakDuration = TimeSpan.FromSeconds(30),
-            ShouldHandle = args => args.Outcome switch
-            {
-                { Exception: HttpRequestException } => PredicateResult.True(),
-                { Result.StatusCode: >= System.Net.HttpStatusCode.InternalServerError } => PredicateResult.True(),
-                _ => PredicateResult.False(),
-            }
-        });
-    });
+    .AddStandardResilienceHandler();
 
 // ============ MASSTRANSIT CONFIGURATION ============
 builder.Services.AddMassTransit(x =>
@@ -135,11 +72,12 @@ builder.Services.AddMassTransit(x =>
     x.AddConsumers(typeof(Program).Assembly);
     x.UsingRabbitMq((context, cfg) =>
     {
-        cfg.Host("rabbitmq", h =>
+        cfg.Host(builder.Configuration["RabbitMQ:Host"] ?? "rabbitmq", h =>
         {
-            h.Username("guest");
-            h.Password("guest");
+            h.Username(builder.Configuration["RabbitMQ:Username"] ?? "guest");
+            h.Password(builder.Configuration["RabbitMQ:Password"] ?? "guest");
         });
+        cfg.UseConsumeFilter(typeof(CorrelationLogFilter<>), context);
         cfg.ConfigureEndpoints(context);
     });
 });
@@ -279,6 +217,20 @@ using (var scope = app.Services.CreateScope())
         logger.LogError(ex, "Error applying database migrations for OrderService");
         throw;
     }
+
 }
 
 app.Run("http://localhost:5003");
+
+public class CorrelationLogFilter<T> : IFilter<ConsumeContext<T>> where T : class
+{
+    public async Task Send(ConsumeContext<T> context, IPipe<ConsumeContext<T>> next)
+    {
+        using (Serilog.Context.LogContext.PushProperty("CorrelationId", context.CorrelationId))
+        {
+            await next.Send(context);
+        }
+    }
+
+    public void Probe(ProbeContext context) => context.CreateFilterScope("correlation-log");
+}

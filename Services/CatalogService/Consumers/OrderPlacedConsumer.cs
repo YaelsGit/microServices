@@ -1,25 +1,23 @@
 using MassTransit;
 using SharedModels.Events;
 using CatalogService.Interfaces;
-using CatalogService.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace CatalogService.Consumers;
 
 /// <summary>
-/// Consumer for OrderPlaced event
-/// Published by: OrderService when a new order is created
-/// Action: Check inventory availability and publish InventoryReserved (success) or InventoryFailed (out of stock)
+/// Consumes OrderPlaced events from RabbitMQ.
+/// Uses IGiftsRepository (MongoDB) — not SQL — for inventory checks.
+/// Publishes InventoryReserved (happy path) or InventoryFailed (compensation).
 /// </summary>
 public class OrderPlacedConsumer : IConsumer<OrderPlaced>
 {
-    private readonly CatalogDbContext _dbContext;
+    private readonly IGiftsRepository _giftsRepository;
     private readonly ILogger<OrderPlacedConsumer> _logger;
     private readonly IPublishEndpoint _publishEndpoint;
 
-    public OrderPlacedConsumer(CatalogDbContext dbContext, ILogger<OrderPlacedConsumer> logger, IPublishEndpoint publishEndpoint)
+    public OrderPlacedConsumer(IGiftsRepository giftsRepository, ILogger<OrderPlacedConsumer> logger, IPublishEndpoint publishEndpoint)
     {
-        _dbContext = dbContext;
+        _giftsRepository = giftsRepository;
         _logger = logger;
         _publishEndpoint = publishEndpoint;
     }
@@ -27,104 +25,80 @@ public class OrderPlacedConsumer : IConsumer<OrderPlaced>
     public async Task Consume(ConsumeContext<OrderPlaced> context)
     {
         var message = context.Message;
-        _logger.LogInformation($"[OrderPlacedConsumer] Received OrderPlaced event for Order: {message.OrderId}");
+        var correlationId = context.CorrelationId ?? message.OrderId;
 
+        using (Serilog.Context.LogContext.PushProperty("CorrelationId", correlationId))
+        {
+            _logger.LogInformation("[OrderPlacedConsumer] Received OrderPlaced for Order: {OrderId}", message.OrderId);
+
+            try
+            {
+                var reservedItems = new List<ReservedItemDto>();
+
+                foreach (var item in message.Items)
+                {
+                    // Convert ProductId (Guid) to GiftId (int)
+                    var giftIdString = item.ProductId.ToString("N");
+                    if (!int.TryParse(giftIdString[..8], System.Globalization.NumberStyles.HexNumber, null, out var giftId))
+                        giftId = Math.Abs(item.ProductId.GetHashCode() % 10000);
+
+                    // Read from MongoDB via repository
+                    var gift = await _giftsRepository.GetGiftByIdAsync(giftId);
+
+                    if (gift == null)
+                    {
+                        _logger.LogError("[OrderPlacedConsumer] Gift not found: {GiftId}", giftId);
+                        await PublishFailed(message.OrderId, $"Gift not found: {giftId}");
+                        return;
+                    }
+
+                    if (gift.Quantity < item.Quantity)
+                    {
+                        _logger.LogWarning("[OrderPlacedConsumer] Insufficient stock for GiftId: {GiftId}. Available: {Available}, Requested: {Requested}",
+                            giftId, gift.Quantity, item.Quantity);
+                        await PublishFailed(message.OrderId, $"Insufficient stock. Available: {gift.Quantity}, Requested: {item.Quantity}");
+                        return;
+                    }
+
+                    // Reserve stock in MongoDB
+                    await _giftsRepository.UpdateGiftQuantityAsync(giftId, -item.Quantity);
+                    _logger.LogInformation("[OrderPlacedConsumer] Stock reserved in MongoDB for GiftId: {GiftId}. Remaining: {Remaining}",
+                        giftId, gift.Quantity - item.Quantity);
+
+                    reservedItems.Add(new ReservedItemDto { ProductId = item.ProductId, Quantity = item.Quantity });
+                }
+
+                await _publishEndpoint.Publish(new InventoryReserved
+                {
+                    OrderId = message.OrderId,
+                    ReservedAt = DateTime.UtcNow,
+                    ReservedItems = reservedItems
+                });
+                _logger.LogInformation("[OrderPlacedConsumer] InventoryReserved published for Order: {OrderId}", message.OrderId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[OrderPlacedConsumer] Unexpected error for Order: {OrderId}", message.OrderId);
+                await PublishFailed(message.OrderId, $"Unexpected error: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task PublishFailed(Guid orderId, string reason)
+    {
         try
         {
-            var reservedItems = new List<ReservedItemDto>();
-
-            // Process each item in the order
-            foreach (var item in message.Items)
+            await _publishEndpoint.Publish(new InventoryFailed
             {
-                // Convert ProductId (Guid) to GiftId (int) 
-                var giftIdString = item.ProductId.ToString("N");
-                if (!int.TryParse(giftIdString.Substring(0, 8), out var giftId))
-                {
-                    giftId = item.ProductId.GetHashCode();
-                }
-
-                // Check if gift exists and has sufficient quantity
-                var gift = await _dbContext.Gifts.FirstOrDefaultAsync(g => g.GiftId == giftId);
-
-                if (gift == null)
-                {
-                    _logger.LogError($"[OrderPlacedConsumer] Gift not found: {giftId}");
-                    
-                    // Publish InventoryFailed event (COMPENSATION)
-                    var failedEvent = new InventoryFailed
-                    {
-                        OrderId = message.OrderId,
-                        FailedAt = DateTime.UtcNow,
-                        Reason = $"Gift not found: {giftId}"
-                    };
-                    
-                    await _publishEndpoint.Publish(failedEvent);
-                    _logger.LogWarning($"[OrderPlacedConsumer] InventoryFailed event published for Order: {message.OrderId} - Gift not found");
-                    return;
-                }
-
-                // Check quantity availability
-                if (gift.Quantity < item.Quantity)
-                {
-                    _logger.LogWarning($"[OrderPlacedConsumer] Insufficient stock for GiftId: {giftId}. Available: {gift.Quantity}, Requested: {item.Quantity}");
-                    
-                    // Publish InventoryFailed event (COMPENSATION)
-                    var failedEvent = new InventoryFailed
-                    {
-                        OrderId = message.OrderId,
-                        FailedAt = DateTime.UtcNow,
-                        Reason = $"Insufficient stock. Available: {gift.Quantity}, Requested: {item.Quantity}"
-                    };
-                    
-                    await _publishEndpoint.Publish(failedEvent);
-                    _logger.LogWarning($"[OrderPlacedConsumer] InventoryFailed event published for Order: {message.OrderId} - Out of stock");
-                    return;
-                }
-
-                // HAPPY PATH: Reserve the stock
-                gift.Quantity -= item.Quantity;
-                await _dbContext.SaveChangesAsync();
-                _logger.LogInformation($"[OrderPlacedConsumer] Stock reserved for GiftId: {giftId}. Remaining: {gift.Quantity}");
-
-                // Add to reserved items
-                reservedItems.Add(new ReservedItemDto
-                {
-                    ProductId = item.ProductId,
-                    Quantity = item.Quantity
-                });
-            }
-
-            // Publish InventoryReserved event (HAPPY PATH)
-            var reservedEvent = new InventoryReserved
-            {
-                OrderId = message.OrderId,
-                ReservedAt = DateTime.UtcNow,
-                ReservedItems = reservedItems
-            };
-
-            await _publishEndpoint.Publish(reservedEvent);
-            _logger.LogInformation($"[OrderPlacedConsumer] InventoryReserved event published for Order: {message.OrderId}");
+                OrderId = orderId,
+                FailedAt = DateTime.UtcNow,
+                Reason = reason
+            });
+            _logger.LogWarning("[OrderPlacedConsumer] InventoryFailed published for Order: {OrderId} — {Reason}", orderId, reason);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"[OrderPlacedConsumer] Error processing OrderPlaced event for Order: {message.OrderId}");
-            
-            // Publish InventoryFailed event on unexpected errors
-            try
-            {
-                var failedEvent = new InventoryFailed
-                {
-                    OrderId = message.OrderId,
-                    FailedAt = DateTime.UtcNow,
-                    Reason = $"Unexpected error: {ex.Message}"
-                };
-                
-                await _publishEndpoint.Publish(failedEvent);
-            }
-            catch (Exception publishEx)
-            {
-                _logger.LogError(publishEx, $"[OrderPlacedConsumer] Failed to publish InventoryFailed event");
-            }
+            _logger.LogError(ex, "[OrderPlacedConsumer] Failed to publish InventoryFailed for Order: {OrderId}", orderId);
         }
     }
 }

@@ -1,91 +1,87 @@
 namespace OrderService.HttpClients;
 
-/// <summary>
-/// HTTP client wrapper for CatalogService calls
-/// Handles communication with CatalogService for gift validation and inventory
-/// </summary>
 public class CatalogServiceClient
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<CatalogServiceClient> _logger;
+    private readonly IHttpContextAccessor _httpContextAccessor;
+    private const string CorrelationIdHeader = "X-Correlation-ID";
 
-    public CatalogServiceClient(HttpClient httpClient, ILogger<CatalogServiceClient> logger)
+    public CatalogServiceClient(HttpClient httpClient, ILogger<CatalogServiceClient> logger, IHttpContextAccessor httpContextAccessor)
     {
         _httpClient = httpClient;
         _logger = logger;
+        _httpContextAccessor = httpContextAccessor;
     }
 
-    /// <summary>
-    /// Get gift details from CatalogService
-    /// </summary>
+    private void ForwardCorrelationId(HttpRequestMessage request)
+    {
+        var correlationId = _httpContextAccessor.HttpContext?.Items["CorrelationId"]?.ToString()
+            ?? _httpContextAccessor.HttpContext?.Request.Headers[CorrelationIdHeader].ToString();
+        if (!string.IsNullOrEmpty(correlationId))
+            request.Headers.TryAddWithoutValidation(CorrelationIdHeader, correlationId);
+    }
+
     public async Task<(bool Success, decimal Price, int Quantity, string Name)> GetGiftAsync(int giftId)
     {
         try
         {
-            var response = await _httpClient.GetAsync($"/catalog/gifts/{giftId}");
+            var request = new HttpRequestMessage(HttpMethod.Get, $"/catalog/gifts/{giftId}");
+            ForwardCorrelationId(request);
 
+            var response = await _httpClient.SendAsync(request);
             if (response.IsSuccessStatusCode)
             {
-                _logger.LogInformation($"Retrieved gift from CatalogService: {giftId}");
-                // In a real scenario, deserialize the response
+                _logger.LogInformation("Retrieved gift from CatalogService: {GiftId}", giftId);
                 return (true, 0m, 0, "Gift Name");
             }
 
-            _logger.LogWarning($"Gift not found in CatalogService: {giftId}");
+            _logger.LogWarning("Gift not found in CatalogService: {GiftId}", giftId);
             return (false, 0m, 0, string.Empty);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error getting gift from CatalogService: {giftId}");
+            _logger.LogError(ex, "Error getting gift from CatalogService: {GiftId}", giftId);
             return (false, 0m, 0, string.Empty);
         }
     }
 
-    /// <summary>
-    /// Check if gift exists and has inventory in CatalogService
-    /// </summary>
     public async Task<bool> GiftExistsAndInStockAsync(int giftId, int quantity)
     {
         try
         {
             var (success, _, available, _) = await GetGiftAsync(giftId);
-            if (!success)
-                return false;
-
-            return available >= quantity;
+            return success && available >= quantity;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error checking gift inventory: {giftId}");
+            _logger.LogError(ex, "Error checking gift inventory: {GiftId}", giftId);
             return false;
         }
     }
 
-    /// <summary>
-    /// Reduce gift quantity after order creation
-    /// </summary>
     public async Task<bool> ReduceGiftQuantityAsync(int giftId, int quantity)
     {
         try
         {
             var request = new HttpRequestMessage(HttpMethod.Patch, $"/catalog/gifts/{giftId}/quantity");
-            request.Content = new StringContent($"{{\"quantityChange\": -{quantity}}}", 
+            request.Content = new StringContent($"{{\"quantityChange\": -{quantity}}}",
                 System.Text.Encoding.UTF8, "application/json");
+            ForwardCorrelationId(request);
 
             var response = await _httpClient.SendAsync(request);
-
             if (response.IsSuccessStatusCode)
             {
-                _logger.LogInformation($"Reduced gift quantity: {giftId} by {quantity}");
+                _logger.LogInformation("Reduced gift quantity: {GiftId} by {Quantity}", giftId, quantity);
                 return true;
             }
 
-            _logger.LogWarning($"Failed to reduce gift quantity: {giftId}");
+            _logger.LogWarning("Failed to reduce gift quantity: {GiftId}", giftId);
             return false;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error reducing gift quantity: {giftId}");
+            _logger.LogError(ex, "Error reducing gift quantity: {GiftId}", giftId);
             return false;
         }
     }
