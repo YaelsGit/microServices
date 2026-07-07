@@ -100,10 +100,10 @@ jobs:
       - name: Start all services
         run: docker compose up -d --build
 
-      - name: Wait for services to be healthy (90s)
+      - name: Wait for services to be healthy (120s)
         run: |
           echo "Waiting for services to start..."
-          sleep 90
+          sleep 120
 
       - name: Check health endpoints
         run: |
