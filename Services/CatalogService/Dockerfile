@@ -10,7 +10,9 @@ COPY ["Shared/SharedModels/SharedModels.csproj", "Shared/SharedModels/"]
 
 # Restore dependencies
 RUN dotnet restore "Services/CatalogService/CatalogService.csproj"
-
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# אם האימג' מבוסס Debian/Ubuntu
+RUN apt-get update && apt-get install -y wget curl
 # Copy all source code
 COPY ["Services/CatalogService/", "Services/CatalogService/"]
 COPY ["Shared/SharedModels/", "Shared/SharedModels/"]

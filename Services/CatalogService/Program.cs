@@ -61,7 +61,7 @@ builder.Services.AddSingleton<JwtTokenService>();
 
 // ============ REDIS CACHE CONFIGURATION ============
 builder.Services.AddSingleton<IConnectionMultiplexer>(
-    ConnectionMultiplexer.Connect("redis:6379"));
+    ConnectionMultiplexer.Connect("redis-cache:6379"));
 builder.Services.AddScoped<ICacheService, CacheService>();
 
 // ============ MASSTRANSIT CONFIGURATION ============

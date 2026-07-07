@@ -26,7 +26,7 @@ public class CatalogServiceClient
     {
         try
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, $"/catalog/gifts/{giftId}");
+            var request = new HttpRequestMessage(HttpMethod.Get, $"/api/gifts/{giftId}");
             ForwardCorrelationId(request);
 
             var response = await _httpClient.SendAsync(request);

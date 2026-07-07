@@ -38,9 +38,9 @@ public class OrderPlacedConsumer : IConsumer<OrderPlaced>
                 foreach (var item in message.Items)
                 {
                     // Convert ProductId (Guid) to GiftId (int)
-                    var giftIdString = item.ProductId.ToString("N");
-                    if (!int.TryParse(giftIdString[..8], System.Globalization.NumberStyles.HexNumber, null, out var giftId))
-                        giftId = Math.Abs(item.ProductId.GetHashCode() % 10000);
+                    // Format: 00000000-0000-0000-0000-000000000001 → 1
+                    var guidStr = item.ProductId.ToString("N"); // 32 hex chars no dashes
+                    var giftId = (int)Convert.ToInt64(guidStr.Substring(20), 16);
 
                     // Read from MongoDB via repository
                     var gift = await _giftsRepository.GetGiftByIdAsync(giftId);

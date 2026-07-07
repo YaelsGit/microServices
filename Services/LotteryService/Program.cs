@@ -245,21 +245,6 @@ if (app.Environment.IsDevelopment())
         options.RoutePrefix = "swagger";
     });
 }
-builder.Services.AddMassTransit(x =>
-{
-    x.AddConsumers(typeof(Program).Assembly);
-
-    x.UsingRabbitMq((context, cfg) =>
-    {
-        cfg.Host("rabbitmq", h =>
-        {
-            h.Username("guest");
-            h.Password("guest");
-        });
-
-        cfg.ConfigureEndpoints(context);
-    });
-});
 // Map controllers
 app.MapControllers();
 

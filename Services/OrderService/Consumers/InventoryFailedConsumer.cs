@@ -31,7 +31,9 @@ public class InventoryFailedConsumer : IConsumer<InventoryFailed>
         try
         {
             // Find the order by OrderId
-            var order = await _dbContext.Orders.FirstOrDefaultAsync(o => o.OrderId.ToString() == message.OrderId.ToString());
+            var guidStr = message.OrderId.ToString("N");
+            var intOrderId = (int)Convert.ToInt64(guidStr.Substring(20), 16);
+            var order = await _dbContext.Orders.FirstOrDefaultAsync(o => o.OrderId == intOrderId);
 
             if (order == null)
             {

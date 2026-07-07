@@ -41,9 +41,10 @@ public class InventoryReservedConsumer : IConsumer<InventoryReserved>
 
             try
             {
-                // Find the order by OrderId
-                // Note: OrderId in events is Guid, but in DB might be int - this is a bridge point
-                var order = await _dbContext.Orders.FirstOrDefaultAsync(o => o.OrderId.ToString() == message.OrderId.ToString());
+                // Extract int OrderId from Guid (last 12 hex chars)
+                var guidStr = message.OrderId.ToString("N");
+                var intOrderId = (int)Convert.ToInt64(guidStr.Substring(20), 16);
+                var order = await _dbContext.Orders.FirstOrDefaultAsync(o => o.OrderId == intOrderId);
 
                 if (order == null)
                 {

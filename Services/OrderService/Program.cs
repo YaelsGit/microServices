@@ -51,7 +51,7 @@ builder.Services.AddHttpContextAccessor();
 // AuthService HTTP Client with resilience policies
 builder.Services.AddHttpClient<AuthServiceClient>(client =>
 {
-    client.BaseAddress = new Uri(builder.Configuration["Services:AuthService:Url"] ?? "http://localhost:5001");
+    client.BaseAddress = new Uri(builder.Configuration["ServiceUrls:AuthService"] ?? "http://auth-service:5001");
     client.DefaultRequestHeaders.Add("Accept", "application/json");
     client.Timeout = TimeSpan.FromSeconds(5);
 })
@@ -60,7 +60,7 @@ builder.Services.AddHttpClient<AuthServiceClient>(client =>
 // CatalogService HTTP Client with resilience policies
 builder.Services.AddHttpClient<CatalogServiceClient>(client =>
 {
-    client.BaseAddress = new Uri(builder.Configuration["Services:CatalogService:Url"] ?? "http://localhost:5002");
+    client.BaseAddress = new Uri(builder.Configuration["ServiceUrls:CatalogService"] ?? "http://nginx-catalog:5002");
     client.DefaultRequestHeaders.Add("Accept", "application/json");
     client.Timeout = TimeSpan.FromSeconds(5);
 })
@@ -72,7 +72,7 @@ builder.Services.AddMassTransit(x =>
     x.AddConsumers(typeof(Program).Assembly);
     x.UsingRabbitMq((context, cfg) =>
     {
-        cfg.Host(builder.Configuration["RabbitMQ:Host"] ?? "rabbitmq", h =>
+        cfg.Host(builder.Configuration["RabbitMQ:Host"] ?? "rabbitmq-service", h =>
         {
             h.Username(builder.Configuration["RabbitMQ:Username"] ?? "guest");
             h.Password(builder.Configuration["RabbitMQ:Password"] ?? "guest");
