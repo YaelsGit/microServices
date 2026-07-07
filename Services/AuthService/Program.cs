@@ -184,4 +184,4 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-app.Run("http://localhost:5001");
+app.Run("http://0.0.0.0:5001");

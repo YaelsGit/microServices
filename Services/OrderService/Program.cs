@@ -220,7 +220,7 @@ using (var scope = app.Services.CreateScope())
 
 }
 
-app.Run("http://localhost:5003");
+app.Run("http://0.0.0.0:5003");
 
 public class CorrelationLogFilter<T> : IFilter<ConsumeContext<T>> where T : class
 {

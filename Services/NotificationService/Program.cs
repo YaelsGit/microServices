@@ -126,4 +126,4 @@ app.MapControllers();
 // Health endpoint
 app.MapGet("/api/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow, service = "NotificationService" }));
 
-app.Run("http://localhost:5005");
+app.Run("http://0.0.0.0:5005");
