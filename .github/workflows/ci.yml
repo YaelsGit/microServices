@@ -8,7 +8,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_PREFIX: ${{ github.repository_owner }}/mechira
+  IMAGE_PREFIX: yaelsgit/mechira
 
 jobs:
   # ─── Job 1: Build solution & run unit tests ───────────────────────────────
